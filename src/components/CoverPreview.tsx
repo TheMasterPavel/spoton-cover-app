@@ -43,7 +43,10 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
           id="card-content-for-canvas" // ID for html2canvas cloning
           className="p-6 flex flex-col items-center space-y-6 bg-card"
         >
-          <div className="relative w-full aspect-square rounded-md overflow-hidden shadow-lg">
+          <div 
+            id="cover-image-container" // Added ID for easier selection in onclone
+            className="relative w-full aspect-square rounded-md overflow-hidden shadow-lg"
+          >
             {imageUrl ? (
               <Image
                 src={imageUrl}
@@ -62,7 +65,7 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
             )}
           </div>
 
-          <div className="w-full text-left"> {/* Changed text-center to text-left */}
+          <div className="w-full text-left">
             <h2 className="text-2xl font-bold text-foreground" title={songTitle || "Título de la Canción"}>
               {songTitle || 'Título de la Canción'}
             </h2>

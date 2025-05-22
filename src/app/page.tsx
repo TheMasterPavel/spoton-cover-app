@@ -79,32 +79,51 @@ export default function HomePage() {
     }
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Pequeña demora para asegurar que la imagen y fuentes estén cargadas
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true, 
         useCORS: true,    
-        backgroundColor: null, // Crucial for transparency
+        backgroundColor: null, 
         width: elementToCapture.offsetWidth, 
         height: elementToCapture.offsetHeight, 
-        scale: window.devicePixelRatio || 1, // For better image quality
+        scale: window.devicePixelRatio || 1, 
         logging: true, 
-        imageTimeout: 20000, 
+        imageTimeout: 30000, // Aumentado tiempo de espera para imágenes
         removeContainer: true,
         scrollX: 0, 
-        scrollY: 0,
+        scrollY: -window.scrollY, // Corregir por el scroll de la página
         onclone: (documentClone) => {
           const clonedCard = documentClone.getElementById('cover-preview-for-canvas');
           const clonedCardContent = documentClone.getElementById('card-content-for-canvas');
+          const imageContainer = documentClone.getElementById('cover-image-container');
+          const imageElement = imageContainer?.querySelector('img') as HTMLImageElement | null;
           
           if (clonedCard) {
             clonedCard.style.backgroundColor = 'transparent';
-            clonedCard.style.boxShadow = 'none'; // Remove shadow for cleaner transparent edge
-            clonedCard.style.border = 'none'; // Ensure no border is captured
+            clonedCard.style.boxShadow = 'none'; 
+            clonedCard.style.border = 'none'; 
           }
           if (clonedCardContent) {
-            // CardContent also might have its own background, make it transparent
             clonedCardContent.style.backgroundColor = 'transparent';
+          }
+          if (imageContainer && imageElement) {
+            // Forzar estilos en el contenedor de la imagen
+            imageContainer.style.position = 'relative';
+            imageContainer.style.width = imageContainer.offsetWidth + 'px'; // Usar dimensiones actuales
+            imageContainer.style.height = imageContainer.offsetHeight + 'px'; // Usar dimensiones actuales
+            imageContainer.style.overflow = 'hidden';
+            imageContainer.style.borderRadius = '0.375rem'; // Equivalente a rounded-md
+
+            // Forzar estilos en la imagen misma para simular layout="fill" y objectFit="cover"
+            imageElement.style.position = 'absolute';
+            imageElement.style.top = '0';
+            imageElement.style.left = '0';
+            imageElement.style.width = '100%';
+            imageElement.style.height = '100%';
+            imageElement.style.objectFit = 'cover';
+            imageElement.style.borderRadius = '0.375rem'; // Equivalente a rounded-md
           }
         },
       });
