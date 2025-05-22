@@ -27,27 +27,45 @@ export default function HomePage() {
   });
   const coverPreviewRef = useRef<HTMLDivElement>(null);
 
-  const handleFormChange = useCallback((values: Partial<CoverFormValues & { coverImageUrl?: string | null }>) => {
-    setPreviewState(prevState => {
-      const updatedState = {
-        ...prevState,
-        ...values,
-      };
+  const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null }>) => {
+    setPreviewState(currentPreviewState => {
+      const updatedState = { ...currentPreviewState };
 
-      if (values.coverImageUrl !== undefined) {
-        updatedState.coverImageUrl = values.coverImageUrl;
+      // Iterate over newValues keys to apply them more explicitly
+      for (const key in newValues) {
+        if (Object.prototype.hasOwnProperty.call(newValues, key)) {
+          const typedKey = key as keyof typeof newValues;
+          if (typedKey === 'coverImageUrl') {
+            updatedState.coverImageUrl = newValues.coverImageUrl;
+          } else if (typedKey === 'coverImageFile') {
+            updatedState.coverImageFile = newValues.coverImageFile;
+          } else if (typedKey === 'durationMinutes' || typedKey === 'durationSeconds' || typedKey === 'progressPercentage') {
+             // Handle number coercion for specific fields
+            const numValue = Number(newValues[typedKey]);
+            if (!isNaN(numValue)) {
+              (updatedState as any)[typedKey] = numValue;
+            } else {
+              // Fallback to current state's value if coercion fails
+              (updatedState as any)[typedKey] = currentPreviewState[typedKey];
+            }
+          } else {
+            // For other properties like songTitle, artistName
+            (updatedState as any)[typedKey] = newValues[typedKey];
+          }
+        }
       }
       
-      if (values.durationMinutes !== undefined) {
-        updatedState.durationMinutes = isNaN(Number(values.durationMinutes)) ? prevState.durationMinutes : Number(values.durationMinutes);
+      // Ensure numeric fields are numbers, with fallbacks
+      if (newValues.durationMinutes !== undefined) {
+        updatedState.durationMinutes = isNaN(Number(newValues.durationMinutes)) ? currentPreviewState.durationMinutes : Number(newValues.durationMinutes);
       }
-      if (values.durationSeconds !== undefined) {
-        updatedState.durationSeconds = isNaN(Number(values.durationSeconds)) ? prevState.durationSeconds : Number(values.durationSeconds);
+      if (newValues.durationSeconds !== undefined) {
+        updatedState.durationSeconds = isNaN(Number(newValues.durationSeconds)) ? currentPreviewState.durationSeconds : Number(newValues.durationSeconds);
       }
-      if (values.progressPercentage !== undefined) {
-        updatedState.progressPercentage = isNaN(Number(values.progressPercentage)) ? prevState.progressPercentage : Number(values.progressPercentage);
+      if (newValues.progressPercentage !== undefined) {
+        updatedState.progressPercentage = isNaN(Number(newValues.progressPercentage)) ? currentPreviewState.progressPercentage : Number(newValues.progressPercentage);
       }
-      
+
       return updatedState;
     });
   }, []);
@@ -64,7 +82,7 @@ export default function HomePage() {
       }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewState.coverImageUrl]);
+  }, [previewState.coverImageUrl, initialFormValues.coverImageUrl]); // Added initialFormValues.coverImageUrl for completeness
 
   const handleDownload = useCallback(async () => {
     const elementToCapture = coverPreviewRef.current;
@@ -93,6 +111,7 @@ export default function HomePage() {
 
 
     try {
+      // Short delay to ensure all styles and images are rendered.
       await new Promise(resolve => setTimeout(resolve, 1500)); 
 
       const canvas = await html2canvas(elementToCapture, {
@@ -101,12 +120,12 @@ export default function HomePage() {
         backgroundColor: null, 
         width: elementToCapture.offsetWidth, 
         height: elementToCapture.offsetHeight, 
-        scale: window.devicePixelRatio || 1, // Restore devicePixelRatio for better quality
+        scale: window.devicePixelRatio || 1, // Use devicePixelRatio for better quality
         logging: false, 
         imageTimeout: 30000, 
-        removeContainer: true,
+        removeContainer: true, // Cleans up the cloned DOM element
         scrollX: 0, 
-        scrollY: -window.scrollY, // Keep this if it helps with page scroll issues
+        scrollY: -window.scrollY, // Compensate for page scroll relative to viewport
         onclone: (documentClone) => {
           const clonedCard = documentClone.getElementById('cover-preview-for-canvas');
           const clonedCardContent = documentClone.getElementById('card-content-for-canvas');
@@ -122,14 +141,15 @@ export default function HomePage() {
 
           const imageContainer = documentClone.getElementById('cover-image-container');
           if (imageContainer) {
-            imageContainer.style.width = `${oicWidth}px`;
-            imageContainer.style.height = `${oicHeight}px`; 
+            imageContainer.style.width = `${oicWidth}px`; // Use captured dimensions
+            imageContainer.style.height = `${oicHeight}px`; // Use captured dimensions
             
+            // Ensure background styles are explicitly set for the clone
             imageContainer.style.backgroundSize = 'cover';
             imageContainer.style.backgroundPosition = 'center center';
             imageContainer.style.backgroundRepeat = 'no-repeat';
             imageContainer.style.borderRadius = '0.375rem'; // Tailwind's rounded-md
-            imageContainer.style.overflow = 'hidden'; 
+            imageContainer.style.overflow = 'hidden'; // Keep overflow hidden
           }
         },
       });
@@ -175,7 +195,7 @@ export default function HomePage() {
         <div className="w-full">
           <CoverForm
             onFormChange={handleFormChange}
-            initialValues={initialFormValues}
+            initialValues={initialFormValues} // This provides default values to the form
             onDownload={handleDownload}
           />
         </div>

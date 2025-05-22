@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { CoverFormSchema, type CoverFormValues } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'; // No se usa directamente pero es bueno tenerlo si se necesitara.
+// Label no se usa directamente, pero es referenciado por FormLabel
 import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
@@ -17,9 +17,9 @@ import { Loader2, Sparkles, Download, Trash2 } from 'lucide-react';
 import React from 'react';
 
 interface CoverFormProps {
-  onFormChange: (values: Partial<CoverFormValues & { coverImageUrl?: string | null }>) => void;
-  initialValues: CoverFormValues & { coverImageUrl?: string | null };
-  onDownload: () => void; // Ya no necesita currentCoverImageUrl
+  onFormChange: (values: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => void;
+  initialValues: CoverFormValues & { coverImageUrl?: string | null }; // Used for reset and initial RHF values
+  onDownload: () => void;
 }
 
 export function CoverForm({ onFormChange, initialValues, onDownload }: CoverFormProps) {
@@ -28,21 +28,29 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
 
   const form = useForm<CoverFormValues>({
     resolver: zodResolver(CoverFormSchema),
-    defaultValues: initialValues,
+    defaultValues: { // RHF gets its initial structure from here
+      songTitle: initialValues.songTitle,
+      artistName: initialValues.artistName,
+      coverImageFile: initialValues.coverImageFile,
+      durationMinutes: initialValues.durationMinutes,
+      durationSeconds: initialValues.durationSeconds,
+      progressPercentage: initialValues.progressPercentage,
+    },
   });
 
-  const { watch, setValue, reset, getValues } = form; // Agregado getValues
+  const { watch, setValue, reset, getValues } = form;
 
   React.useEffect(() => {
-    const subscription = watch((values, { name }) => {
-      // Solo actualiza coverImageUrl si no es un cambio de imagen (ya manejado en handleImageUpload/handleGenerateAiCover)
-      // Esto previene que onFormChange sin coverImageUrl borre la imagen actual en el estado padre.
-      if (name === 'coverImageFile') {
-        // La lógica de coverImageUrl se maneja en handleImageUpload y handleGenerateAiCover
-        // Solo pasamos el archivo aquí.
-        onFormChange({ coverImageFile: values.coverImageFile });
-      } else {
-        onFormChange(values as Partial<CoverFormValues>);
+    const subscription = watch((formStateFromRHF, { name }) => {
+      // coverImageFile changes are handled by its own input onChange -> handleImageUpload
+      // which directly calls onFormChange with coverImageUrl and coverImageFile.
+      // So, we only need to call onFormChange here for other field changes.
+      if (name !== 'coverImageFile') {
+        // For other fields (songTitle, artistName, durations, progress),
+        // send up their current state from RHF.
+        // Exclude coverImageFile from this update path, as it's handled by handleImageUpload.
+        const { coverImageFile, ...otherRelevantState } = formStateFromRHF;
+        onFormChange(otherRelevantState);
       }
     });
     return () => subscription.unsubscribe();
@@ -54,18 +62,20 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
+        // Send both the new image URL for preview and the file itself for RHF & state
         onFormChange({ coverImageFile: event.target.files, coverImageUrl: reader.result as string });
-        setValue('coverImageFile', event.target.files, { shouldValidate: true });
+        setValue('coverImageFile', event.target.files, { shouldValidate: true }); // Update RHF
       };
       reader.readAsDataURL(file);
     } else {
-      onFormChange({ coverImageFile: undefined, coverImageUrl: initialValues.coverImageUrl || 'https://placehold.co/600x600.png' });
+      // If file is cleared, reset to placeholder and clear file in RHF
+      onFormChange({ coverImageFile: undefined, coverImageUrl: initialValues.coverImageUrl });
       setValue('coverImageFile', undefined);
     }
   };
 
   const handleGenerateAiCover = async () => {
-    const { songTitle, artistName } = getValues(); // Usar getValues para obtener los valores actuales del formulario
+    const { songTitle, artistName } = getValues(); 
     if (!songTitle || !artistName) {
       toast({
         title: 'Información Faltante',
@@ -79,16 +89,17 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
     setIsGeneratingAi(true);
     try {
       const result = await generateAlbumCoverAction({ songTitle, artistName });
-      if (result.albumCoverDataUri) {
+      if (result.albumCoverDataUri && result.albumCoverDataUri.startsWith('data:image')) {
+        // AI generated an image, clear any user-uploaded file.
         onFormChange({ coverImageUrl: result.albumCoverDataUri, coverImageFile: undefined });
-        // setValue('coverImageFile', undefined); // No es necesario si la IA no establece este campo
+        setValue('coverImageFile', undefined); // Clear file from RHF
         toast({
           title: '¡Portada IA Generada!',
           description: 'La IA ha creado una portada única para ti.',
           duration: 3000,
         });
       } else {
-        throw new Error('La IA no devolvió una imagen.');
+        throw new Error('La IA no devolvió una imagen válida.');
       }
     } catch (error) {
       console.error('Error en Generación de Portada IA:', error);
@@ -98,21 +109,28 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
         variant: 'destructive',
         duration: 5000,
       });
-      // Restablece a la imagen de placeholder o la inicial si falla la IA
-      onFormChange({ coverImageUrl: initialValues.coverImageUrl || 'https://placehold.co/600x600.png' }); 
+      // On failure, revert to initial placeholder. Don't clear coverImageFile if user had one before trying AI.
+      onFormChange({ coverImageUrl: initialValues.coverImageUrl }); 
     } finally {
       setIsGeneratingAi(false);
     }
   };
 
   const handleResetForm = () => {
-    reset(initialValues); 
-    onFormChange({ ...initialValues, coverImageUrl: initialValues.coverImageUrl || 'https://placehold.co/600x600.png' }); 
+    reset({ // Reset RHF to initial values
+      songTitle: initialValues.songTitle,
+      artistName: initialValues.artistName,
+      coverImageFile: initialValues.coverImageFile, // usually undefined
+      durationMinutes: initialValues.durationMinutes,
+      durationSeconds: initialValues.durationSeconds,
+      progressPercentage: initialValues.progressPercentage,
+    }); 
+    // Also reset HomePage state (including coverImageUrl)
+    onFormChange({ ...initialValues, coverImageUrl: initialValues.coverImageUrl }); 
   };
 
-  // El formulario ahora solo llama a onDownload, que obtiene la URL de la imagen del estado padre.
   const onSubmit = () => {
-    onDownload();
+    onDownload(); // HomePage's onDownload uses its own previewState
   };
 
   return (
@@ -154,7 +172,9 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
                 id="coverImageFile-input"
                 type="file" 
                 accept="image/png, image/jpeg, image/webp"
-                onChange={handleImageUpload} // RHF se encarga del valor a través de setValue en handleImageUpload
+                // RHF's setValue is called within handleImageUpload for the 'coverImageFile' field.
+                // So we don't use field.onChange here.
+                onChange={handleImageUpload}
                 className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
               />
             </FormControl>
@@ -210,10 +230,10 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
                 <FormControl>
                    <Slider
                     value={[value !== undefined && value !== null ? value : 0]}
-                    onValueChange={(vals) => onChange(vals[0])}
+                    onValueChange={(vals) => onChange(vals[0])} // RHF onChange handles the number
                     max={100}
                     step={1}
-                    className="[&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green"
+                    className="[&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green" // Assuming --spotify-green is a valid CSS var or this is Tailwind JIT
                     aria-label="Porcentaje de progreso de la canción"
                     {...restField}
                   />
