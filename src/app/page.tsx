@@ -13,7 +13,7 @@ const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   songTitle: 'Melodía Increíble',
   artistName: 'Los Gatos Geniales',
   coverImageFile: undefined,
-  coverImageUrl: 'https://placehold.co/600x600.png',
+  coverImageUrl: 'https://placehold.co/600x600.png', // Default placeholder
   durationMinutes: 3,
   durationSeconds: 30,
   progressPercentage: 40,
@@ -60,7 +60,7 @@ export default function HomePage() {
     if (!previewState.coverImageUrl) {
       setPreviewState(prevState => ({
         ...prevState,
-        coverImageUrl: initialFormValues.coverImageUrl
+        coverImageUrl: initialFormValues.coverImageUrl 
       }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -78,7 +78,6 @@ export default function HomePage() {
       return;
     }
 
-    // Capturar las dimensiones del contenedor de imagen del DOM original (vivo)
     const originalImageContainer = elementToCapture.querySelector<HTMLDivElement>('#cover-image-container');
     if (!originalImageContainer) {
       toast({
@@ -94,7 +93,6 @@ export default function HomePage() {
 
 
     try {
-      // Pequeña demora para asegurar que la imagen y fuentes estén cargadas
       await new Promise(resolve => setTimeout(resolve, 1500)); 
 
       const canvas = await html2canvas(elementToCapture, {
@@ -103,8 +101,8 @@ export default function HomePage() {
         backgroundColor: null, 
         width: elementToCapture.offsetWidth, 
         height: elementToCapture.offsetHeight, 
-        scale: window.devicePixelRatio || 1, 
-        logging: true, 
+        scale: 1, // Changed to 1 for now to debug distortion, will revert to window.devicePixelRatio
+        logging: false, // Set to true for more detailed console logs if needed
         imageTimeout: 30000, 
         removeContainer: true,
         scrollX: 0, 
@@ -123,24 +121,17 @@ export default function HomePage() {
           }
 
           const imageContainer = documentClone.getElementById('cover-image-container');
-          const imageElement = imageContainer?.querySelector('img') as HTMLImageElement | null;
-          
-          if (imageContainer && imageElement) {
-            // Forzar estilos en el contenedor de la imagen CLONADO usando dimensiones del ORIGINAL
-            imageContainer.style.position = 'relative';
-            imageContainer.style.width = `${oicWidth}px`; // Usar dimensiones capturadas del original
-            imageContainer.style.height = `${oicHeight}px`; // Usar dimensiones capturadas del original
-            imageContainer.style.overflow = 'hidden';
-            imageContainer.style.borderRadius = '0.375rem'; // Equivalente a rounded-md
-
-            // Forzar estilos en la imagen CLONADA misma para simular layout="fill" y objectFit="cover"
-            imageElement.style.position = 'absolute';
-            imageElement.style.top = '0';
-            imageElement.style.left = '0';
-            imageElement.style.width = '100%';
-            imageElement.style.height = '100%';
-            imageElement.style.objectFit = 'cover';
-            imageElement.style.borderRadius = '0.375rem'; // Equivalente a rounded-md
+          if (imageContainer) {
+            // Apply explicit dimensions to the cloned image container
+            imageContainer.style.width = `${oicWidth}px`;
+            imageContainer.style.height = `${oicHeight}px`; // Should be same as oicWidth for aspect-square
+            
+            // Ensure other styles that might be class-based are applied directly for html2canvas
+            imageContainer.style.backgroundSize = 'cover';
+            imageContainer.style.backgroundPosition = 'center center';
+            imageContainer.style.backgroundRepeat = 'no-repeat';
+            imageContainer.style.borderRadius = '0.375rem'; // Tailwind's rounded-md
+            imageContainer.style.overflow = 'hidden'; // Important for rounded corners with background images
           }
         },
       });
@@ -212,3 +203,4 @@ export default function HomePage() {
     </main>
   );
 }
+

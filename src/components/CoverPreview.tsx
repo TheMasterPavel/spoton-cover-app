@@ -1,7 +1,7 @@
 
 'use client';
 import React from 'react';
-import Image from 'next/image';
+// Removed Image from 'next/image'
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -44,32 +44,27 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
           className="p-6 flex flex-col items-center space-y-6 bg-card"
         >
           <div 
-            id="cover-image-container" // Added ID for easier selection in onclone
-            className="relative w-full aspect-square rounded-md overflow-hidden shadow-lg"
+            id="cover-image-container"
+            className="w-full aspect-square rounded-md overflow-hidden shadow-lg bg-muted flex items-center justify-center" // Added flex items-center justify-center for placeholder
+            style={imageUrl ? {
+              backgroundImage: `url(${imageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center center',
+              backgroundRepeat: 'no-repeat',
+            } : {}}
+            data-ai-hint={imageUrl ? "album cover" : "abstract music"}
           >
-            {imageUrl ? (
-              <Image
-                src={imageUrl}
-                alt={songTitle || 'Portada del álbum'}
-                layout="fill"
-                objectFit="cover"
-                className="rounded-md"
-                data-ai-hint="album cover"
-                priority 
-                unoptimized 
-              />
-            ) : (
-              <div className="w-full h-full bg-muted flex items-center justify-center rounded-md" data-ai-hint="abstract music">
-                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-music text-muted-foreground/50"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-              </div>
+            {!imageUrl && (
+              // SVG placeholder is now a direct child, centered by parent's flex properties
+              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-music text-muted-foreground/50"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
             )}
           </div>
 
           <div className="w-full text-left">
-            <h2 className="text-2xl font-bold text-foreground" title={songTitle || "Título de la Canción"}>
+            <h2 className="text-2xl font-bold text-foreground">
               {songTitle || 'Título de la Canción'}
             </h2>
-            <p className="text-muted-foreground text-sm" title={artistName || "Nombre del Artista"}>
+            <p className="text-muted-foreground text-sm">
               {artistName || 'Nombre del Artista'}
             </p>
           </div>
