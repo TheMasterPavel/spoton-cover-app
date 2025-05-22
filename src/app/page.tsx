@@ -45,40 +45,41 @@ export default function HomePage() {
     setPreviewState(currentPreviewState => {
       const updatedState = { ...currentPreviewState };
 
-      // Merge known fields carefully
+      // Merge known non-image fields carefully
       if (newValues.songTitle !== undefined) updatedState.songTitle = newValues.songTitle;
       if (newValues.artistName !== undefined) updatedState.artistName = newValues.artistName;
       
       if (newValues.durationMinutes !== undefined) {
         updatedState.durationMinutes = isNaN(Number(newValues.durationMinutes)) ? currentPreviewState.durationMinutes : Number(newValues.durationMinutes);
-      } else if (newValues.hasOwnProperty('durationMinutes') && newValues.durationMinutes === null) { // Allow resetting to initial or null
+      } else if (newValues.hasOwnProperty('durationMinutes') && newValues.durationMinutes === null) {
          updatedState.durationMinutes = initialFormValues.durationMinutes;
       }
 
       if (newValues.durationSeconds !== undefined) {
         updatedState.durationSeconds = isNaN(Number(newValues.durationSeconds)) ? currentPreviewState.durationSeconds : Number(newValues.durationSeconds);
-      } else if (newValues.hasOwnProperty('durationSeconds') && newValues.durationSeconds === null) { // Allow resetting
+      } else if (newValues.hasOwnProperty('durationSeconds') && newValues.durationSeconds === null) {
          updatedState.durationSeconds = initialFormValues.durationSeconds;
       }
 
       if (newValues.progressPercentage !== undefined) {
         updatedState.progressPercentage = isNaN(Number(newValues.progressPercentage)) ? currentPreviewState.progressPercentage : Number(newValues.progressPercentage);
-      } else if (newValues.hasOwnProperty('progressPercentage') && newValues.progressPercentage === null) { // Allow resetting
+      } else if (newValues.hasOwnProperty('progressPercentage') && newValues.progressPercentage === null) {
          updatedState.progressPercentage = initialFormValues.progressPercentage;
       }
       
-      // Explicitly handle image fields only if they are part of newValues
-      // This ensures slider changes or text input changes don't accidentally clear the image
-      if (newValues.hasOwnProperty('coverImageFile')) {
+      if (newValues.hasOwnProperty('coverImageFile')) { 
         updatedState.coverImageFile = newValues.coverImageFile;
-      }
-      if (newValues.hasOwnProperty('coverImageUrl')) {
+        updatedState.coverImageUrl = newValues.coverImageUrl ?? currentPreviewState.coverImageUrl; 
+      } else if (newValues.hasOwnProperty('coverImageUrl')) { 
         updatedState.coverImageUrl = newValues.coverImageUrl;
+        if (newValues.coverImageUrl !== currentPreviewState.coverImageUrl) { 
+            updatedState.coverImageFile = undefined;
+        }
       }
       
       return updatedState;
     });
-  }, []);
+  }, [initialFormValues.durationMinutes, initialFormValues.durationSeconds, initialFormValues.progressPercentage]);
 
 
   const handlePlayPauseToggle = useCallback(() => {
@@ -86,8 +87,6 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    // This effect ensures that if an image is cleared (e.g. user removes a file),
-    // it reverts to the initial placeholder, not just blank.
     if (!previewState.coverImageUrl && !previewState.coverImageFile && initialFormValues.coverImageUrl) { 
       setPreviewState(prevState => ({
         ...prevState,
@@ -122,8 +121,7 @@ export default function HomePage() {
     const oicHeight = originalImageContainer.offsetHeight;
 
     try {
-      // Brief delay to allow DOM updates and image rendering
-      await new Promise(resolve => setTimeout(resolve, 500)); 
+      await new Promise(resolve => setTimeout(resolve, 1000)); 
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
@@ -132,12 +130,11 @@ export default function HomePage() {
         width: elementToCapture.offsetWidth,
         height: elementToCapture.offsetHeight,
         scale: 2, 
-        logging: false, 
+        logging: true, 
         imageTimeout: 15000, 
         scrollX: 0,
         scrollY: -window.scrollY, 
         onclone: (documentClone) => {
-          // Ensure the cloned document's root elements are transparent for the capture
           documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
           documentClone.body.style.setProperty('background-color', 'transparent', 'important');
           
@@ -147,7 +144,7 @@ export default function HomePage() {
 
           if (clonedCard) {
             clonedCard.style.setProperty('background-color', 'transparent', 'important');
-            clonedCard.style.setProperty('background', 'transparent', 'important'); // Ensure all background properties are transparent
+            clonedCard.style.setProperty('background', 'transparent', 'important');
             clonedCard.style.boxShadow = 'none';
             clonedCard.style.border = 'none';
           }
@@ -160,21 +157,21 @@ export default function HomePage() {
             imageContainerClone.style.width = `${oicWidth}px`;
             imageContainerClone.style.height = `${oicHeight}px`;
             
-            // Explicitly re-apply background image styles to the clone
             if (previewState.coverImageUrl) {
+              // Explicitly set the background image style on the clone
               imageContainerClone.style.backgroundImage = `url(${previewState.coverImageUrl})`;
               imageContainerClone.style.backgroundSize = 'cover';
               imageContainerClone.style.backgroundPosition = 'center center';
               imageContainerClone.style.backgroundRepeat = 'no-repeat';
-              imageContainerClone.style.backgroundColor = ''; // Ensure no competing background color
+              // DO NOT set backgroundColor here if there is an image, let the backgroundImage be the source
             } else {
               // Handle placeholder: make background transparent and clear any potential lingering backgroundImage
               imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
               imageContainerClone.style.backgroundImage = '';
             }
             
-            imageContainerClone.style.borderRadius = '0.375rem'; // Corresponds to rounded-md
-            imageContainerClone.style.overflow = 'hidden'; // Important for cover effect
+            imageContainerClone.style.borderRadius = '0.375rem'; 
+            imageContainerClone.style.overflow = 'hidden'; 
           }
         },
       });
@@ -202,7 +199,7 @@ export default function HomePage() {
         duration: 5000,
       });
     }
-  }, [toast, previewState.coverImageUrl]); // Added previewState.coverImageUrl
+  }, [toast, previewState.coverImageUrl]); // Removed oicWidth, oicHeight
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
@@ -245,7 +242,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between p-3 bg-card rounded-lg shadow-md">
               <p className="text-sm font-medium text-foreground flex items-center">
                 <Palette size={18} className="mr-2 text-primary"/>
-                Elementos Previsualización:
+                Previsualización (Elementos):
               </p>
               <div className="flex gap-2">
                 <Button 
@@ -254,7 +251,7 @@ export default function HomePage() {
                   size="sm"
                   disabled={themeMode === 'dark'}
                   aria-label="Cambiar a elementos blancos (fondo oscuro previsualización)"
-                  className={themeMode === 'dark' ? 'border-primary text-primary' : ''}
+                  className={themeMode === 'dark' ? 'border-primary text-primary cursor-not-allowed' : 'border-input hover:bg-accent hover:text-accent-foreground'}
                 >
                   Blancos
                 </Button>
@@ -264,7 +261,7 @@ export default function HomePage() {
                   size="sm"
                   disabled={themeMode === 'light'}
                   aria-label="Cambiar a elementos negros (fondo claro previsualización)"
-                   className={themeMode === 'light' ? 'border-primary text-primary' : ''}
+                  className={themeMode === 'light' ? 'border-primary text-primary cursor-not-allowed' : 'border-input hover:bg-accent hover:text-accent-foreground'}
                 >
                   Negros
                 </Button>

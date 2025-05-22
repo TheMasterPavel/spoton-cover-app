@@ -16,7 +16,7 @@ interface CoverPreviewProps {
   progressPercentage: number;
   isPlaying: boolean;
   onPlayPauseToggle: () => void;
-  themeMode: 'dark' | 'light'; // 'dark' = elementos blancos, 'light' = elementos negros
+  themeMode: 'dark' | 'light'; 
 }
 
 export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
@@ -35,19 +35,14 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
   ) => {
     const currentTimeSeconds = (progressPercentage / 100) * durationSeconds;
 
-    // Colores base según el themeMode
     const cardBgColor = themeMode === 'light' ? 'bg-neutral-200' : 'bg-card';
-    const primaryTextColor = themeMode === 'light' ? 'text-neutral-800' : 'text-foreground'; // Negro/Gris oscuro para light, Blanco para dark
-    const secondaryTextColor = themeMode === 'light' ? 'text-neutral-600' : 'text-muted-foreground'; // Gris medio para light, Gris suave para dark
-    
+    const primaryTextColor = themeMode === 'light' ? 'text-neutral-800' : 'text-foreground'; 
+    const secondaryTextColor = themeMode === 'light' ? 'text-neutral-600' : 'text-muted-foreground'; 
     const controlIconColor = themeMode === 'light' ? 'text-neutral-600 hover:text-neutral-900' : 'text-muted-foreground hover:text-foreground';
-    
     const playButtonClasses = themeMode === 'light' 
-      ? 'bg-neutral-800 text-neutral-100 hover:bg-neutral-900' // Botón oscuro con icono claro
-      : 'bg-foreground text-background hover:bg-foreground/90'; // Botón claro con icono oscuro (original dark)
-
+      ? 'bg-neutral-800 text-neutral-100 hover:bg-neutral-900' 
+      : 'bg-foreground text-background hover:bg-foreground/90'; 
     const playButtonIconFillClass = themeMode === 'light' ? 'fill-neutral-100' : 'fill-background';
-    
     const placeholderSvgColor = themeMode === 'light' ? 'text-neutral-500' : 'text-muted-foreground/50';
 
 
@@ -57,22 +52,20 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
         id="cover-preview-for-canvas"
         className={cn(
           "w-full max-w-sm shadow-xl border-none rounded-lg overflow-hidden",
-          // No aplicar color de fondo a la Card directamente, se hará en CardContent
-          // para facilitar la transparencia en html2canvas para el padding de la Card si lo tuviera.
         )}
       >
         <CardContent 
           id="card-content-for-canvas"
           className={cn(
             "p-6 flex flex-col items-center space-y-6",
-            cardBgColor // El fondo se aplica aquí
+            cardBgColor 
           )}
         >
           <div 
             id="cover-image-container"
             className={cn(
               "w-full aspect-square rounded-md overflow-hidden shadow-lg flex items-center justify-center",
-              imageUrl ? '' : (themeMode === 'light' ? 'bg-neutral-300' : 'bg-muted') // Fondo para placeholder
+              !imageUrl && (themeMode === 'light' ? 'bg-neutral-300' : 'bg-muted') 
             )}
             style={imageUrl ? {
               backgroundImage: `url(${imageUrl})`,
@@ -80,10 +73,23 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
               backgroundPosition: 'center center',
               backgroundRepeat: 'no-repeat',
             } : {}}
-            data-ai-hint={imageUrl ? "album cover" : "abstract music"}
+            // data-ai-hint removed for clarity with html2canvas
           >
             {!imageUrl && (
-              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("lucide lucide-music", placeholderSvgColor)}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="64" height="64" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={cn("lucide lucide-music", placeholderSvgColor)}
+                data-ai-hint="abstract music" // data-ai-hint only on placeholder
+              >
+                <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+              </svg>
             )}
           </div>
 
@@ -126,7 +132,7 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
               onClick={onPlayPauseToggle}
               aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
             >
-              {isPlaying ? <Pause size={28} className={playButtonIconFillClass} /> : <Play size={28} className={playButtonIconFillClass} />}
+              {isPlaying ? <Pause size={28} className={cn(playButtonIconFillClass, "fill-current")} /> : <Play size={28} className={cn(playButtonIconFillClass, "fill-current")} />}
             </Button>
             <Button variant="ghost" size="icon" className={controlIconColor}>
               <SkipForward size={24} />
