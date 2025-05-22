@@ -7,19 +7,18 @@ export async function generateAlbumCoverAction(
   input: GenerateAlbumCoverInput
 ): Promise<GenerateAlbumCoverOutput> {
   try {
-    // Validate input if necessary, though Zod in flow should handle it.
     const output = await generateAlbumCover(input);
     if (!output.albumCoverDataUri) {
-      throw new Error('AI failed to generate an image data URI.');
+      throw new Error('La IA no pudo generar un URI de datos de imagen.');
     }
     return output;
   } catch (error) {
-    console.error('Error in generateAlbumCoverAction:', error);
-    // It's better to re-throw or return a structured error
-    // For now, re-throwing to be caught by the client-side try/catch
+    console.error('Error en generateAlbumCoverAction:', error);
     if (error instanceof Error) {
-      throw new Error(`AI Generation failed: ${error.message}`);
+      // Prefer keeping original error message for technical details if it's from the AI service itself
+      // But prefix with a user-friendly Spanish message.
+      throw new Error(`Falló la generación con IA: ${error.message}`);
     }
-    throw new Error('An unknown error occurred during AI image generation.');
+    throw new Error('Ocurrió un error desconocido durante la generación de imágenes con IA.');
   }
 }

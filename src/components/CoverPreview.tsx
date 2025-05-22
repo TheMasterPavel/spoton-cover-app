@@ -33,7 +33,7 @@ export function CoverPreview({
           {imageUrl ? (
             <Image
               src={imageUrl}
-              alt={songTitle || 'Album art'}
+              alt={songTitle || 'Portada del álbum'}
               layout="fill"
               objectFit="cover"
               className="rounded-md"
@@ -47,11 +47,11 @@ export function CoverPreview({
         </div>
 
         <div className="w-full text-center">
-          <h2 className="text-2xl font-bold text-foreground truncate" title={songTitle || "Song Title"}>
-            {songTitle || 'Song Title'}
+          <h2 className="text-2xl font-bold text-foreground truncate" title={songTitle || "Título de la Canción"}>
+            {songTitle || 'Título de la Canción'}
           </h2>
-          <p className="text-muted-foreground text-sm truncate" title={artistName || "Artist Name"}>
-            {artistName || 'Artist Name'}
+          <p className="text-muted-foreground text-sm truncate" title={artistName || "Nombre del Artista"}>
+            {artistName || 'Nombre del Artista'}
           </p>
         </div>
 
@@ -61,7 +61,7 @@ export function CoverPreview({
             max={100}
             step={1}
             className="w-full [&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green"
-            aria-label="Song progress"
+            aria-label="Progreso de la canción"
             disabled // Visually represents progress, not user-interactive in this preview
           />
           <div className="flex justify-between text-xs text-muted-foreground">
@@ -82,7 +82,7 @@ export function CoverPreview({
             size="icon"
             className="bg-foreground text-background hover:bg-foreground/90 rounded-full h-12 w-12"
             onClick={onPlayPauseToggle}
-            aria-label={isPlaying ? 'Pause' : 'Play'}
+            aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
           >
             {isPlaying ? <Pause size={28} className="fill-background" /> : <Play size={28} className="fill-background ml-1" />}
           </Button>

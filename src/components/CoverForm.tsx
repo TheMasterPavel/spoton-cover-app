@@ -11,20 +11,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { generateAlbumCoverAction } from '@/lib/actions';
-import { Loader2, UploadCloud, Sparkles, Download, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, Download, Trash2 } from 'lucide-react';
 import React from 'react';
 
 interface CoverFormProps {
   onFormChange: (values: Partial<CoverFormValues & { coverImageUrl?: string | null }>) => void;
   initialValues: CoverFormValues & { coverImageUrl?: string | null };
+  currentCoverImageUrl?: string | null;
+  onDownload: (imageUrl: string | null | undefined) => void;
 }
 
-export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
+export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, onDownload }: CoverFormProps) {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<CoverFormValues>({
@@ -34,8 +34,6 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
 
   const { watch, setValue, reset } = form;
 
-  // Watch form values to update preview
-  // This is a bit heavy, consider debouncing or updating on blur for performance if needed.
   React.useEffect(() => {
     const subscription = watch((values) => {
       onFormChange(values as Partial<CoverFormValues>);
@@ -54,7 +52,7 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
       };
       reader.readAsDataURL(file);
     } else {
-      onFormChange({ coverImageFile: undefined, coverImageUrl: null });
+      onFormChange({ coverImageFile: undefined, coverImageUrl: initialValues.coverImageUrl || 'https://placehold.co/600x600.png' });
       setValue('coverImageFile', undefined);
     }
   };
@@ -63,9 +61,10 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
     const { songTitle, artistName } = form.getValues();
     if (!songTitle || !artistName) {
       toast({
-        title: 'Missing Information',
-        description: 'Please enter a song title and artist name to generate an AI cover.',
+        title: 'Información Faltante',
+        description: 'Por favor, introduce un título de canción y nombre de artista para generar una portada con IA.',
         variant: 'destructive',
+        duration: 3000,
       });
       return;
     }
@@ -75,36 +74,36 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
       const result = await generateAlbumCoverAction({ songTitle, artistName });
       if (result.albumCoverDataUri) {
         onFormChange({ coverImageUrl: result.albumCoverDataUri, coverImageFile: undefined });
-        setValue('coverImageFile', undefined); // Clear file input if AI image is generated
+        setValue('coverImageFile', undefined); 
         toast({
-          title: 'AI Cover Generated!',
-          description: 'The AI has crafted a unique cover for you.',
+          title: '¡Portada IA Generada!',
+          description: 'La IA ha creado una portada única para ti.',
+          duration: 3000,
         });
       } else {
-        throw new Error('AI did not return an image.');
+        throw new Error('La IA no devolvió una imagen.');
       }
     } catch (error) {
-      console.error('AI Cover Generation Error:', error);
+      console.error('Error en Generación de Portada IA:', error);
       toast({
-        title: 'AI Generation Failed',
-        description: (error as Error).message || 'Could not generate AI cover. Please try again.',
+        title: 'Falló la Generación IA',
+        description: (error as Error).message || 'No se pudo generar la portada IA. Por favor, inténtalo de nuevo.',
         variant: 'destructive',
+        duration: 5000,
       });
-      onFormChange({ coverImageUrl: null }); // Clear image on failure
+      onFormChange({ coverImageUrl: initialValues.coverImageUrl || 'https://placehold.co/600x600.png' }); 
     } finally {
       setIsGeneratingAi(false);
     }
   };
 
   const handleResetForm = () => {
-    reset(initialValues); // Resets react-hook-form
-    onFormChange({ ...initialValues, coverImageUrl: initialValues.coverImageUrl || null }); // Resets parent state
+    reset(initialValues); 
+    onFormChange({ ...initialValues, coverImageUrl: initialValues.coverImageUrl || null }); 
   };
 
   const onSubmit = (_values: CoverFormValues) => {
-    // Main form submission could trigger download or other actions
-    // For now, download is separate.
-    setShowPaymentDialog(true);
+    onDownload(currentCoverImageUrl);
   };
 
   return (
@@ -116,9 +115,9 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
             name="songTitle"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Song Title</FormLabel>
+                <FormLabel>Título de la Canción</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter song title" {...field} className="bg-input text-foreground placeholder:text-muted-foreground/70" />
+                  <Input placeholder="Introduce el título de la canción" {...field} className="bg-input text-foreground placeholder:text-muted-foreground/70" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -130,9 +129,9 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
             name="artistName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Artist Name</FormLabel>
+                <FormLabel>Nombre del Artista</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter artist name" {...field} className="bg-input text-foreground placeholder:text-muted-foreground/70" />
+                  <Input placeholder="Introduce el nombre del artista" {...field} className="bg-input text-foreground placeholder:text-muted-foreground/70" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -140,7 +139,7 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
           />
           
           <FormItem>
-            <FormLabel htmlFor="coverImageFile-input">Cover Image (Optional)</FormLabel>
+            <FormLabel htmlFor="coverImageFile-input">Imagen de Portada (Opcional)</FormLabel>
             <FormControl>
                <Input 
                 id="coverImageFile-input"
@@ -161,7 +160,7 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
             disabled={isGeneratingAi || !watch('songTitle') || !watch('artistName')}
           >
             {isGeneratingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            Generate AI Cover
+            Generar Portada con IA
           </Button>
           
           <div className="grid grid-cols-2 gap-4">
@@ -170,7 +169,7 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
               name="durationMinutes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration (Min)</FormLabel>
+                  <FormLabel>Duración (Min)</FormLabel>
                   <FormControl>
                     <Input type="number" placeholder="MM" {...field} min="0" max="599" className="bg-input text-foreground placeholder:text-muted-foreground/70"/>
                   </FormControl>
@@ -183,7 +182,7 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
               name="durationSeconds"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration (Sec)</FormLabel>
+                  <FormLabel>Duración (Seg)</FormLabel>
                   <FormControl>
                     <Input type="number" placeholder="SS" {...field} min="0" max="59" className="bg-input text-foreground placeholder:text-muted-foreground/70"/>
                   </FormControl>
@@ -196,17 +195,17 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
           <FormField
             control={form.control}
             name="progressPercentage"
-            render={({ field: { onChange, value, ...restField } }) => ( // Destructure field to correctly pass value to Slider
+            render={({ field: { onChange, value, ...restField } }) => ( 
               <FormItem>
-                <FormLabel>Progress: {value}%</FormLabel>
+                <FormLabel>Progreso: {value}%</FormLabel>
                 <FormControl>
                    <Slider
-                    value={[value]}
+                    value={[value !== undefined && value !== null ? value : 0]} // Ensure value is not undefined for Slider
                     onValueChange={(vals) => onChange(vals[0])}
                     max={100}
                     step={1}
                     className="[&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green"
-                    aria-label="Song progress percentage"
+                    aria-label="Porcentaje de progreso de la canción"
                     {...restField}
                   />
                 </FormControl>
@@ -217,35 +216,14 @@ export function CoverForm({ onFormChange, initialValues }: CoverFormProps) {
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
              <Button type="button" variant="outline" onClick={handleResetForm} className="w-full sm:w-auto">
-              <Trash2 className="mr-2 h-4 w-4" /> Reset
+              <Trash2 className="mr-2 h-4 w-4" /> Reiniciar
             </Button>
             <Button type="submit" className="w-full flex-grow bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Download className="mr-2 h-4 w-4" /> Download Cover (€0.99)
+              <Download className="mr-2 h-4 w-4" /> Descargar Portada
             </Button>
           </div>
         </form>
       </Form>
-
-      <AlertDialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unlock Download</AlertDialogTitle>
-            <AlertDialogDescription>
-              To download your SpotOn Cover as a PNG image with a transparent background (named spotify_cover.png), a one-time payment of €0.99 is required.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              toast({ title: 'Payment Gateway', description: 'Redirecting to payment... (Mocked)' });
-              setShowPaymentDialog(false);
-              // Actual payment integration would go here
-            }}>
-              Proceed to Payment (€0.99)
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
