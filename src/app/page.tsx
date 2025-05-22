@@ -101,12 +101,12 @@ export default function HomePage() {
         backgroundColor: null, 
         width: elementToCapture.offsetWidth, 
         height: elementToCapture.offsetHeight, 
-        scale: 1, // Changed to 1 for now to debug distortion, will revert to window.devicePixelRatio
-        logging: false, // Set to true for more detailed console logs if needed
+        scale: window.devicePixelRatio || 1, // Restore devicePixelRatio for better quality
+        logging: false, 
         imageTimeout: 30000, 
         removeContainer: true,
         scrollX: 0, 
-        scrollY: -window.scrollY, 
+        scrollY: -window.scrollY, // Keep this if it helps with page scroll issues
         onclone: (documentClone) => {
           const clonedCard = documentClone.getElementById('cover-preview-for-canvas');
           const clonedCardContent = documentClone.getElementById('card-content-for-canvas');
@@ -122,16 +122,14 @@ export default function HomePage() {
 
           const imageContainer = documentClone.getElementById('cover-image-container');
           if (imageContainer) {
-            // Apply explicit dimensions to the cloned image container
             imageContainer.style.width = `${oicWidth}px`;
-            imageContainer.style.height = `${oicHeight}px`; // Should be same as oicWidth for aspect-square
+            imageContainer.style.height = `${oicHeight}px`; 
             
-            // Ensure other styles that might be class-based are applied directly for html2canvas
             imageContainer.style.backgroundSize = 'cover';
             imageContainer.style.backgroundPosition = 'center center';
             imageContainer.style.backgroundRepeat = 'no-repeat';
             imageContainer.style.borderRadius = '0.375rem'; // Tailwind's rounded-md
-            imageContainer.style.overflow = 'hidden'; // Important for rounded corners with background images
+            imageContainer.style.overflow = 'hidden'; 
           }
         },
       });
@@ -203,4 +201,3 @@ export default function HomePage() {
     </main>
   );
 }
-
