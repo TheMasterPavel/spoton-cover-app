@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { CoverFormSchema, type CoverFormValues } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label } from '@/components/ui/label'; // No se usa directamente pero es bueno tenerlo si se necesitara.
 import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
@@ -19,11 +19,10 @@ import React from 'react';
 interface CoverFormProps {
   onFormChange: (values: Partial<CoverFormValues & { coverImageUrl?: string | null }>) => void;
   initialValues: CoverFormValues & { coverImageUrl?: string | null };
-  currentCoverImageUrl?: string | null;
-  onDownload: (imageUrl: string | null | undefined) => void;
+  onDownload: () => void; // Ya no necesita currentCoverImageUrl
 }
 
-export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, onDownload }: CoverFormProps) {
+export function CoverForm({ onFormChange, initialValues, onDownload }: CoverFormProps) {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const { toast } = useToast();
 
@@ -32,11 +31,19 @@ export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, o
     defaultValues: initialValues,
   });
 
-  const { watch, setValue, reset } = form;
+  const { watch, setValue, reset, getValues } = form; // Agregado getValues
 
   React.useEffect(() => {
-    const subscription = watch((values) => {
-      onFormChange(values as Partial<CoverFormValues>);
+    const subscription = watch((values, { name }) => {
+      // Solo actualiza coverImageUrl si no es un cambio de imagen (ya manejado en handleImageUpload/handleGenerateAiCover)
+      // Esto previene que onFormChange sin coverImageUrl borre la imagen actual en el estado padre.
+      if (name === 'coverImageFile') {
+        // La lógica de coverImageUrl se maneja en handleImageUpload y handleGenerateAiCover
+        // Solo pasamos el archivo aquí.
+        onFormChange({ coverImageFile: values.coverImageFile });
+      } else {
+        onFormChange(values as Partial<CoverFormValues>);
+      }
     });
     return () => subscription.unsubscribe();
   }, [watch, onFormChange]);
@@ -58,7 +65,7 @@ export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, o
   };
 
   const handleGenerateAiCover = async () => {
-    const { songTitle, artistName } = form.getValues();
+    const { songTitle, artistName } = getValues(); // Usar getValues para obtener los valores actuales del formulario
     if (!songTitle || !artistName) {
       toast({
         title: 'Información Faltante',
@@ -74,7 +81,7 @@ export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, o
       const result = await generateAlbumCoverAction({ songTitle, artistName });
       if (result.albumCoverDataUri) {
         onFormChange({ coverImageUrl: result.albumCoverDataUri, coverImageFile: undefined });
-        setValue('coverImageFile', undefined); 
+        // setValue('coverImageFile', undefined); // No es necesario si la IA no establece este campo
         toast({
           title: '¡Portada IA Generada!',
           description: 'La IA ha creado una portada única para ti.',
@@ -91,6 +98,7 @@ export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, o
         variant: 'destructive',
         duration: 5000,
       });
+      // Restablece a la imagen de placeholder o la inicial si falla la IA
       onFormChange({ coverImageUrl: initialValues.coverImageUrl || 'https://placehold.co/600x600.png' }); 
     } finally {
       setIsGeneratingAi(false);
@@ -99,11 +107,12 @@ export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, o
 
   const handleResetForm = () => {
     reset(initialValues); 
-    onFormChange({ ...initialValues, coverImageUrl: initialValues.coverImageUrl || null }); 
+    onFormChange({ ...initialValues, coverImageUrl: initialValues.coverImageUrl || 'https://placehold.co/600x600.png' }); 
   };
 
-  const onSubmit = (_values: CoverFormValues) => {
-    onDownload(currentCoverImageUrl);
+  // El formulario ahora solo llama a onDownload, que obtiene la URL de la imagen del estado padre.
+  const onSubmit = () => {
+    onDownload();
   };
 
   return (
@@ -145,7 +154,7 @@ export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, o
                 id="coverImageFile-input"
                 type="file" 
                 accept="image/png, image/jpeg, image/webp"
-                onChange={handleImageUpload} 
+                onChange={handleImageUpload} // RHF se encarga del valor a través de setValue en handleImageUpload
                 className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
               />
             </FormControl>
@@ -171,7 +180,7 @@ export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, o
                 <FormItem>
                   <FormLabel>Duración (Min)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="MM" {...field} min="0" max="599" className="bg-input text-foreground placeholder:text-muted-foreground/70"/>
+                    <Input type="number" placeholder="MM" {...field} value={field.value ?? ''} onChange={e => field.onChange(parseInt(e.target.value,10))} min="0" max="599" className="bg-input text-foreground placeholder:text-muted-foreground/70"/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -184,7 +193,7 @@ export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, o
                 <FormItem>
                   <FormLabel>Duración (Seg)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="SS" {...field} min="0" max="59" className="bg-input text-foreground placeholder:text-muted-foreground/70"/>
+                    <Input type="number" placeholder="SS" {...field} value={field.value ?? ''} onChange={e => field.onChange(parseInt(e.target.value,10))} min="0" max="59" className="bg-input text-foreground placeholder:text-muted-foreground/70"/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -197,10 +206,10 @@ export function CoverForm({ onFormChange, initialValues, currentCoverImageUrl, o
             name="progressPercentage"
             render={({ field: { onChange, value, ...restField } }) => ( 
               <FormItem>
-                <FormLabel>Progreso: {value}%</FormLabel>
+                <FormLabel>Progreso: {value !== undefined && value !== null ? value : 0}%</FormLabel>
                 <FormControl>
                    <Slider
-                    value={[value !== undefined && value !== null ? value : 0]} // Ensure value is not undefined for Slider
+                    value={[value !== undefined && value !== null ? value : 0]}
                     onValueChange={(vals) => onChange(vals[0])}
                     max={100}
                     step={1}
