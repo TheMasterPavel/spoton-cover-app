@@ -45,7 +45,6 @@ export default function HomePage() {
     setPreviewState(currentPreviewState => {
       const updatedState = { ...currentPreviewState };
 
-      // Merge known non-image fields carefully
       if (newValues.songTitle !== undefined) updatedState.songTitle = newValues.songTitle;
       if (newValues.artistName !== undefined) updatedState.artistName = newValues.artistName;
       
@@ -117,6 +116,7 @@ export default function HomePage() {
       });
       return;
     }
+    // Define oicWidth and oicHeight *inside* the function, they are not dependencies of useCallback
     const oicWidth = originalImageContainer.offsetWidth;
     const oicHeight = originalImageContainer.offsetHeight;
 
@@ -133,7 +133,7 @@ export default function HomePage() {
         logging: true, 
         imageTimeout: 15000, 
         scrollX: 0,
-        scrollY: -window.scrollY, 
+        scrollY: typeof window !== 'undefined' ? -window.scrollY : 0, 
         onclone: (documentClone) => {
           documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
           documentClone.body.style.setProperty('background-color', 'transparent', 'important');
@@ -163,11 +163,11 @@ export default function HomePage() {
               imageContainerClone.style.backgroundSize = 'cover';
               imageContainerClone.style.backgroundPosition = 'center center';
               imageContainerClone.style.backgroundRepeat = 'no-repeat';
-              // DO NOT set backgroundColor here if there is an image, let the backgroundImage be the source
+              // DO NOT set backgroundColor here if there is an image
             } else {
               // Handle placeholder: make background transparent and clear any potential lingering backgroundImage
               imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
-              imageContainerClone.style.backgroundImage = '';
+              imageContainerClone.style.backgroundImage = ''; 
             }
             
             imageContainerClone.style.borderRadius = '0.375rem'; 
@@ -199,7 +199,10 @@ export default function HomePage() {
         duration: 5000,
       });
     }
-  }, [toast, previewState.coverImageUrl]); // Removed oicWidth, oicHeight
+  // The dependency array for useCallback should only include variables from the outer scope
+  // that captureAndDownloadCover actually depends on.
+  // oicWidth and oicHeight are calculated inside, so they are NOT dependencies.
+  }, [toast, previewState.coverImageUrl]); 
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
