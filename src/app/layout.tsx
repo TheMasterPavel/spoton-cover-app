@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="dark"> {/* Ensure dark theme is applied if any components rely on .dark selector, lang set to es */}
+    <html lang="es" className="dark">
       <body className={`${geistSans.variable} antialiased bg-background text-foreground`}>
         {children}
         <Toaster /> {/* Add Toaster for notifications */}
