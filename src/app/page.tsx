@@ -80,18 +80,20 @@ export default function HomePage() {
 
     try {
       // Aumentar la demora para asegurar que estilos, fuentes e imágenes se hayan renderizado completamente
-      await new Promise(resolve => setTimeout(resolve, 500)); // Aumentado a 500ms
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Aumentado a 1000ms
 
       const canvas = await html2canvas(elementToCapture, {
-        useCORS: true, // Necesario para imágenes de otros dominios (ej. placehold.co)
-        allowTaint: true, // Puede ayudar con problemas de CORS residuales
-        backgroundColor: 'transparent', // Fondo del canvas transparente, el estilo del elemento dará el color real
-        width: elementToCapture.offsetWidth, // Capturar al ancho renderizado actual del elemento
-        height: elementToCapture.offsetHeight, // Capturar al alto renderizado actual del elemento
-        scale: 1, // Empezar con escala 1 para depurar distorsiones. Luego se puede probar window.devicePixelRatio para mejor calidad.
-        logging: true, // Activar logs de html2canvas en la consola del navegador para depuración
-        imageTimeout: 15000, // Aumentar el tiempo de espera para imágenes
-        removeContainer: true, // Limpiar el contenedor temporal que usa html2canvas
+        allowTaint: true, 
+        useCORS: true,    
+        backgroundColor: null, // Dejar que el fondo del elemento se use
+        width: elementToCapture.offsetWidth, 
+        height: elementToCapture.offsetHeight, 
+        scale: 1, // Mantener escala 1 para depurar problemas de diseño primero
+        logging: true, 
+        imageTimeout: 20000, // Aumentar tiempo de espera para imágenes
+        removeContainer: true,
+        scrollX: 0, // Asegurar que la captura empiece en el origen del elemento
+        scrollY: 0,
       });
       const imageMimeType = 'image/png';
       const imageUrlToDownload = canvas.toDataURL(imageMimeType);
@@ -141,7 +143,6 @@ export default function HomePage() {
         </div>
         
         <div className="w-full mt-8 flex justify-center">
-          {/* Asegúrate de que el div que envuelve CoverPreview no imponga dimensiones conflictivas */}
           <CoverPreview
             ref={coverPreviewRef}
             songTitle={previewState.songTitle}

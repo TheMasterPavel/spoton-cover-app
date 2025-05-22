@@ -61,10 +61,10 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
           </div>
 
           <div className="w-full text-center">
-            <h2 className="text-2xl font-bold text-foreground truncate" title={songTitle || "Título de la Canción"}>
+            <h2 className="text-2xl font-bold text-foreground" title={songTitle || "Título de la Canción"}>
               {songTitle || 'Título de la Canción'}
             </h2>
-            <p className="text-muted-foreground text-sm truncate" title={artistName || "Nombre del Artista"}>
+            <p className="text-muted-foreground text-sm" title={artistName || "Nombre del Artista"}>
               {artistName || 'Nombre del Artista'}
             </p>
           </div>
@@ -98,7 +98,7 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
               onClick={onPlayPauseToggle}
               aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
             >
-              {isPlaying ? <Pause size={28} className="fill-background" /> : <Play size={28} className="fill-background" />} {/* Eliminado ml-1 de Play */}
+              {isPlaying ? <Pause size={28} className="fill-background" /> : <Play size={28} className="fill-background" />}
             </Button>
             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
               <SkipForward size={24} />
