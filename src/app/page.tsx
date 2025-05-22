@@ -39,12 +39,13 @@ export default function HomePage() {
   });
   const coverPreviewRef = useRef<HTMLDivElement>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark'); // 'dark' = elementos blancos, 'light' = elementos negros
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
   const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => {
     setPreviewState(currentPreviewState => {
       const updatedState = { ...currentPreviewState };
 
+      // Merge known fields carefully
       if (newValues.songTitle !== undefined) updatedState.songTitle = newValues.songTitle;
       if (newValues.artistName !== undefined) updatedState.artistName = newValues.artistName;
       if (newValues.durationMinutes !== undefined) {
@@ -57,7 +58,7 @@ export default function HomePage() {
         updatedState.progressPercentage = isNaN(Number(newValues.progressPercentage)) ? currentPreviewState.progressPercentage : Number(newValues.progressPercentage);
       }
       
-      // Solo actualiza la imagen si se proporciona explícitamente en newValues
+      // Explicitly handle image fields only if they are part of newValues
       if (newValues.hasOwnProperty('coverImageFile')) {
         updatedState.coverImageFile = newValues.coverImageFile;
       }
@@ -75,8 +76,6 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    // Si no hay URL de imagen Y no hay archivo de imagen, Y los valores iniciales tenían una URL, resetea a la URL inicial.
-    // Esto es para que al borrar un archivo subido, se vuelva al placeholder si no hay IA.
     if (!previewState.coverImageUrl && !previewState.coverImageFile && initialFormValues.coverImageUrl) { 
       setPreviewState(prevState => ({
         ...prevState,
@@ -97,6 +96,7 @@ export default function HomePage() {
       return;
     }
 
+    // Get dimensions of the original image container to apply to the clone
     const originalImageContainer = elementToCapture.querySelector<HTMLDivElement>('#cover-image-container');
     if (!originalImageContainer) {
       toast({
@@ -111,21 +111,22 @@ export default function HomePage() {
     const oicHeight = originalImageContainer.offsetHeight;
 
     try {
+      // Brief delay to ensure all elements, especially images and fonts, are fully rendered
       await new Promise(resolve => setTimeout(resolve, 500)); 
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null, 
+        backgroundColor: null, // Ensure background is transparent if elements are
         width: elementToCapture.offsetWidth,
         height: elementToCapture.offsetHeight,
-        scale: window.devicePixelRatio || 1,
-        logging: false,
-        imageTimeout: 15000,
+        scale: 2, // Changed from window.devicePixelRatio || 1 to a fixed 2 for potentially better quality
+        logging: false, // Set to true for debugging html2canvas issues
+        imageTimeout: 15000, // Increased timeout for image loading
         scrollX: 0,
-        scrollY: -window.scrollY, // Ajusta para el scroll de la página
+        scrollY: -window.scrollY, // Adjust for page scroll
         onclone: (documentClone) => {
-          // Forzar fondo transparente en los elementos principales del clon
+          // Force transparent background on main cloned elements for transparent PNG output
           documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
           documentClone.body.style.setProperty('background-color', 'transparent', 'important');
           
@@ -135,28 +136,30 @@ export default function HomePage() {
 
           if (clonedCard) {
             clonedCard.style.setProperty('background-color', 'transparent', 'important');
-            clonedCard.style.setProperty('background', 'transparent', 'important'); // Añadido por si acaso
+            clonedCard.style.setProperty('background', 'transparent', 'important');
             clonedCard.style.boxShadow = 'none';
             clonedCard.style.border = 'none';
           }
           if (clonedCardContent) {
             clonedCardContent.style.setProperty('background-color', 'transparent', 'important');
-            clonedCardContent.style.setProperty('background', 'transparent', 'important'); // Añadido por si acaso
+            clonedCardContent.style.setProperty('background', 'transparent', 'important');
           }
           if (imageContainerClone) {
+            // Apply original dimensions to the cloned image container
             imageContainerClone.style.width = `${oicWidth}px`;
             imageContainerClone.style.height = `${oicHeight}px`;
-            // El background-image ya se aplica a través de la prop 'style' en CoverPreview
+            // background-image is already set via style prop in CoverPreview
+            // Ensure other background properties are correctly set for html2canvas
             imageContainerClone.style.backgroundSize = 'cover';
             imageContainerClone.style.backgroundPosition = 'center center';
             imageContainerClone.style.backgroundRepeat = 'no-repeat';
-            imageContainerClone.style.borderRadius = '0.375rem'; // md
-            imageContainerClone.style.overflow = 'hidden'; // Para asegurar esquinas redondeadas si la imagen es más grande
-            imageContainerClone.style.setProperty('background-color', 'transparent', 'important'); // Para el caso del placeholder SVG
+            imageContainerClone.style.borderRadius = '0.375rem'; // Corresponds to rounded-md
+            imageContainerClone.style.overflow = 'hidden'; // Ensure rounded corners clip content
+            imageContainerClone.style.setProperty('background-color', 'transparent', 'important'); // For placeholder SVG case
           }
         },
       });
-      const imageMimeType = 'image/png';
+      const imageMimeType = 'image/png'; // PNG for transparency
       const imageUrlToDownload = canvas.toDataURL(imageMimeType);
 
       const link = document.createElement('a');
@@ -191,7 +194,7 @@ export default function HomePage() {
     toast({
       title: "Pago Confirmado (Simulado)",
       description: "Gracias por tu compra. Iniciando descarga...",
-      className: "bg-green-600 text-white",
+      className: "bg-green-600 text-white", // Use ShadCN theme or Tailwind for success
       duration: 3000,
     });
     captureAndDownloadCover();
@@ -215,7 +218,7 @@ export default function HomePage() {
           <CoverForm
             onFormChange={handleFormChange}
             initialValues={initialFormValues}
-            onDownload={handleInitiateDownload}
+            onDownload={handleInitiateDownload} // This now initiates the payment dialog
           />
         </div>
         
@@ -231,6 +234,7 @@ export default function HomePage() {
                   variant={themeMode === 'dark' ? 'default' : 'outline'}
                   size="sm"
                   disabled={themeMode === 'dark'}
+                  aria-label="Cambiar a elementos blancos (fondo oscuro previsualización)"
                 >
                   Blancos
                 </Button>
@@ -239,6 +243,7 @@ export default function HomePage() {
                   variant={themeMode === 'light' ? 'default' : 'outline'}
                   size="sm"
                   disabled={themeMode === 'light'}
+                  aria-label="Cambiar a elementos negros (fondo claro previsualización)"
                 >
                   Negros
                 </Button>
@@ -248,7 +253,7 @@ export default function HomePage() {
         </div>
 
 
-        <div className="w-full mt-2 flex justify-center"> {/* Reducido mt-8 a mt-2 */}
+        <div className="w-full mt-2 flex justify-center">
           <CoverPreview
             ref={coverPreviewRef}
             songTitle={previewState.songTitle}
