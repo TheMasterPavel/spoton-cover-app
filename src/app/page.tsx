@@ -48,17 +48,27 @@ export default function HomePage() {
       // Merge known fields carefully
       if (newValues.songTitle !== undefined) updatedState.songTitle = newValues.songTitle;
       if (newValues.artistName !== undefined) updatedState.artistName = newValues.artistName;
+      
       if (newValues.durationMinutes !== undefined) {
         updatedState.durationMinutes = isNaN(Number(newValues.durationMinutes)) ? currentPreviewState.durationMinutes : Number(newValues.durationMinutes);
+      } else if (newValues.hasOwnProperty('durationMinutes') && newValues.durationMinutes === null) { // Allow resetting to initial or null
+         updatedState.durationMinutes = initialFormValues.durationMinutes;
       }
+
       if (newValues.durationSeconds !== undefined) {
         updatedState.durationSeconds = isNaN(Number(newValues.durationSeconds)) ? currentPreviewState.durationSeconds : Number(newValues.durationSeconds);
+      } else if (newValues.hasOwnProperty('durationSeconds') && newValues.durationSeconds === null) { // Allow resetting
+         updatedState.durationSeconds = initialFormValues.durationSeconds;
       }
+
       if (newValues.progressPercentage !== undefined) {
         updatedState.progressPercentage = isNaN(Number(newValues.progressPercentage)) ? currentPreviewState.progressPercentage : Number(newValues.progressPercentage);
+      } else if (newValues.hasOwnProperty('progressPercentage') && newValues.progressPercentage === null) { // Allow resetting
+         updatedState.progressPercentage = initialFormValues.progressPercentage;
       }
       
       // Explicitly handle image fields only if they are part of newValues
+      // This ensures slider changes or text input changes don't accidentally clear the image
       if (newValues.hasOwnProperty('coverImageFile')) {
         updatedState.coverImageFile = newValues.coverImageFile;
       }
@@ -76,6 +86,8 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    // This effect ensures that if an image is cleared (e.g. user removes a file),
+    // it reverts to the initial placeholder, not just blank.
     if (!previewState.coverImageUrl && !previewState.coverImageFile && initialFormValues.coverImageUrl) { 
       setPreviewState(prevState => ({
         ...prevState,
@@ -110,6 +122,7 @@ export default function HomePage() {
     const oicHeight = originalImageContainer.offsetHeight;
 
     try {
+      // Brief delay to allow DOM updates and image rendering
       await new Promise(resolve => setTimeout(resolve, 500)); 
 
       const canvas = await html2canvas(elementToCapture, {
@@ -124,6 +137,7 @@ export default function HomePage() {
         scrollX: 0,
         scrollY: -window.scrollY, 
         onclone: (documentClone) => {
+          // Ensure the cloned document's root elements are transparent for the capture
           documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
           documentClone.body.style.setProperty('background-color', 'transparent', 'important');
           
@@ -133,7 +147,7 @@ export default function HomePage() {
 
           if (clonedCard) {
             clonedCard.style.setProperty('background-color', 'transparent', 'important');
-            clonedCard.style.setProperty('background', 'transparent', 'important');
+            clonedCard.style.setProperty('background', 'transparent', 'important'); // Ensure all background properties are transparent
             clonedCard.style.boxShadow = 'none';
             clonedCard.style.border = 'none';
           }
@@ -141,22 +155,26 @@ export default function HomePage() {
             clonedCardContent.style.setProperty('background-color', 'transparent', 'important');
             clonedCardContent.style.setProperty('background', 'transparent', 'important');
           }
+
           if (imageContainerClone) {
             imageContainerClone.style.width = `${oicWidth}px`;
             imageContainerClone.style.height = `${oicHeight}px`;
-            imageContainerClone.style.backgroundSize = 'cover';
-            imageContainerClone.style.backgroundPosition = 'center center';
-            imageContainerClone.style.backgroundRepeat = 'no-repeat';
-            imageContainerClone.style.borderRadius = '0.375rem'; 
-            imageContainerClone.style.overflow = 'hidden'; 
             
-            if (!previewState.coverImageUrl) { // Only make transparent if it's the placeholder
-              imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
+            // Explicitly re-apply background image styles to the clone
+            if (previewState.coverImageUrl) {
+              imageContainerClone.style.backgroundImage = `url(${previewState.coverImageUrl})`;
+              imageContainerClone.style.backgroundSize = 'cover';
+              imageContainerClone.style.backgroundPosition = 'center center';
+              imageContainerClone.style.backgroundRepeat = 'no-repeat';
+              imageContainerClone.style.backgroundColor = ''; // Ensure no competing background color
             } else {
-              // Ensure no explicit background color is set on the clone if an image is present,
-              // allowing the backgroundImage to be the sole determinant.
-              imageContainerClone.style.backgroundColor = ''; 
+              // Handle placeholder: make background transparent and clear any potential lingering backgroundImage
+              imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
+              imageContainerClone.style.backgroundImage = '';
             }
+            
+            imageContainerClone.style.borderRadius = '0.375rem'; // Corresponds to rounded-md
+            imageContainerClone.style.overflow = 'hidden'; // Important for cover effect
           }
         },
       });
@@ -184,7 +202,7 @@ export default function HomePage() {
         duration: 5000,
       });
     }
-  }, [toast, previewState.coverImageUrl]); // Added previewState.coverImageUrl to dependencies
+  }, [toast, previewState.coverImageUrl]); // Added previewState.coverImageUrl
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
@@ -227,7 +245,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between p-3 bg-card rounded-lg shadow-md">
               <p className="text-sm font-medium text-foreground flex items-center">
                 <Palette size={18} className="mr-2 text-primary"/>
-                Color Elementos Previsualización:
+                Elementos Previsualización:
               </p>
               <div className="flex gap-2">
                 <Button 
