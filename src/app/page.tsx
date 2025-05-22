@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react'; // Add useRef
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { CoverForm } from '@/components/CoverForm';
 import { CoverPreview } from '@/components/CoverPreview';
 import type { CoverFormValues } from '@/lib/schema';
 import { Music2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import html2canvas from 'html2canvas'; // Import html2canvas
+import html2canvas from 'html2canvas';
 
 const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   songTitle: 'Melodía Increíble',
@@ -25,7 +25,7 @@ export default function HomePage() {
     ...initialFormValues,
     isPlaying: false,
   });
-  const coverPreviewRef = useRef<HTMLDivElement>(null); // Create a ref for CoverPreview
+  const coverPreviewRef = useRef<HTMLDivElement>(null);
 
   const handleFormChange = useCallback((values: Partial<CoverFormValues & { coverImageUrl?: string | null }>) => {
     setPreviewState(prevState => {
@@ -67,7 +67,8 @@ export default function HomePage() {
   }, [previewState.coverImageUrl]);
 
   const handleDownload = useCallback(async () => {
-    if (!coverPreviewRef.current) {
+    const elementToCapture = coverPreviewRef.current;
+    if (!elementToCapture) {
       toast({
         title: 'Error de Descarga',
         description: 'No se pudo encontrar el elemento de previsualización para descargar.',
@@ -78,22 +79,19 @@ export default function HomePage() {
     }
 
     try {
-      // Asegurarse de que la imagen de next/image esté completamente cargada
-      // A veces html2canvas puede tener problemas con imágenes cargadas de forma asíncrona.
-      // Pequeña demora para dar tiempo a que las imágenes se procesen si es necesario.
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Aumentar la demora para asegurar que estilos, fuentes e imágenes se hayan renderizado completamente
+      await new Promise(resolve => setTimeout(resolve, 500)); // Aumentado a 500ms
 
-      const canvas = await html2canvas(coverPreviewRef.current, {
-        useCORS: true, 
-        backgroundColor: null, 
-        logging: false, // Desactivar logs de html2canvas en consola
-        // Forzar que se renderice con el tamaño actual del elemento, sin escalar por dpi inicialmente
-        // ya que el Card tiene un max-w-sm. El tamaño resultante dependerá de eso.
-        // Si se necesita una resolución específica, se pueden añadir width/height aquí, pero puede distorsionar.
-        onclone: (documentClone) => {
-          // Si hay problemas con next/image, aquí se podrían reemplazar por <img> normales
-          // pero usualmente `unoptimized` y `priority` en `next/image` ayudan.
-        }
+      const canvas = await html2canvas(elementToCapture, {
+        useCORS: true, // Necesario para imágenes de otros dominios (ej. placehold.co)
+        allowTaint: true, // Puede ayudar con problemas de CORS residuales
+        backgroundColor: 'transparent', // Fondo del canvas transparente, el estilo del elemento dará el color real
+        width: elementToCapture.offsetWidth, // Capturar al ancho renderizado actual del elemento
+        height: elementToCapture.offsetHeight, // Capturar al alto renderizado actual del elemento
+        scale: 1, // Empezar con escala 1 para depurar distorsiones. Luego se puede probar window.devicePixelRatio para mejor calidad.
+        logging: true, // Activar logs de html2canvas en la consola del navegador para depuración
+        imageTimeout: 15000, // Aumentar el tiempo de espera para imágenes
+        removeContainer: true, // Limpiar el contenedor temporal que usa html2canvas
       });
       const imageMimeType = 'image/png';
       const imageUrlToDownload = canvas.toDataURL(imageMimeType);
@@ -111,15 +109,15 @@ export default function HomePage() {
         duration: 3000,
       });
     } catch (error) {
-      console.error('Error al generar la imagen para descarga:', error);
+      console.error('Error al generar la imagen para descarga con html2canvas:', error);
       toast({
         title: 'Error de Descarga',
-        description: 'No se pudo generar la imagen de la portada. Inténtalo de nuevo.',
+        description: 'No se pudo generar la imagen de la portada. Revisa la consola para más detalles e inténtalo de nuevo.',
         variant: 'destructive',
         duration: 5000,
       });
     }
-  }, [toast]); // coverPreviewRef es estable, toast también.
+  }, [toast]);
 
   const totalDurationSeconds = (previewState.durationMinutes * 60) + previewState.durationSeconds;
 
@@ -143,8 +141,9 @@ export default function HomePage() {
         </div>
         
         <div className="w-full mt-8 flex justify-center">
+          {/* Asegúrate de que el div que envuelve CoverPreview no imponga dimensiones conflictivas */}
           <CoverPreview
-            ref={coverPreviewRef} // Pass the ref here
+            ref={coverPreviewRef}
             songTitle={previewState.songTitle}
             artistName={previewState.artistName}
             imageUrl={previewState.coverImageUrl}
