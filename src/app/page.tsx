@@ -96,7 +96,6 @@ export default function HomePage() {
       return;
     }
 
-    // Get dimensions of the original image container to apply to the clone
     const originalImageContainer = elementToCapture.querySelector<HTMLDivElement>('#cover-image-container');
     if (!originalImageContainer) {
       toast({
@@ -111,22 +110,20 @@ export default function HomePage() {
     const oicHeight = originalImageContainer.offsetHeight;
 
     try {
-      // Brief delay to ensure all elements, especially images and fonts, are fully rendered
       await new Promise(resolve => setTimeout(resolve, 500)); 
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null, // Ensure background is transparent if elements are
+        backgroundColor: null, 
         width: elementToCapture.offsetWidth,
         height: elementToCapture.offsetHeight,
-        scale: 2, // Changed from window.devicePixelRatio || 1 to a fixed 2 for potentially better quality
-        logging: false, // Set to true for debugging html2canvas issues
-        imageTimeout: 15000, // Increased timeout for image loading
+        scale: 2, 
+        logging: false, 
+        imageTimeout: 15000, 
         scrollX: 0,
-        scrollY: -window.scrollY, // Adjust for page scroll
+        scrollY: -window.scrollY, 
         onclone: (documentClone) => {
-          // Force transparent background on main cloned elements for transparent PNG output
           documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
           documentClone.body.style.setProperty('background-color', 'transparent', 'important');
           
@@ -145,21 +142,25 @@ export default function HomePage() {
             clonedCardContent.style.setProperty('background', 'transparent', 'important');
           }
           if (imageContainerClone) {
-            // Apply original dimensions to the cloned image container
             imageContainerClone.style.width = `${oicWidth}px`;
             imageContainerClone.style.height = `${oicHeight}px`;
-            // background-image is already set via style prop in CoverPreview
-            // Ensure other background properties are correctly set for html2canvas
             imageContainerClone.style.backgroundSize = 'cover';
             imageContainerClone.style.backgroundPosition = 'center center';
             imageContainerClone.style.backgroundRepeat = 'no-repeat';
-            imageContainerClone.style.borderRadius = '0.375rem'; // Corresponds to rounded-md
-            imageContainerClone.style.overflow = 'hidden'; // Ensure rounded corners clip content
-            imageContainerClone.style.setProperty('background-color', 'transparent', 'important'); // For placeholder SVG case
+            imageContainerClone.style.borderRadius = '0.375rem'; 
+            imageContainerClone.style.overflow = 'hidden'; 
+            
+            if (!previewState.coverImageUrl) { // Only make transparent if it's the placeholder
+              imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
+            } else {
+              // Ensure no explicit background color is set on the clone if an image is present,
+              // allowing the backgroundImage to be the sole determinant.
+              imageContainerClone.style.backgroundColor = ''; 
+            }
           }
         },
       });
-      const imageMimeType = 'image/png'; // PNG for transparency
+      const imageMimeType = 'image/png'; 
       const imageUrlToDownload = canvas.toDataURL(imageMimeType);
 
       const link = document.createElement('a');
@@ -183,7 +184,7 @@ export default function HomePage() {
         duration: 5000,
       });
     }
-  }, [toast]);
+  }, [toast, previewState.coverImageUrl]); // Added previewState.coverImageUrl to dependencies
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
@@ -194,7 +195,7 @@ export default function HomePage() {
     toast({
       title: "Pago Confirmado (Simulado)",
       description: "Gracias por tu compra. Iniciando descarga...",
-      className: "bg-green-600 text-white", // Use ShadCN theme or Tailwind for success
+      className: "bg-green-600 text-white", 
       duration: 3000,
     });
     captureAndDownloadCover();
@@ -218,12 +219,12 @@ export default function HomePage() {
           <CoverForm
             onFormChange={handleFormChange}
             initialValues={initialFormValues}
-            onDownload={handleInitiateDownload} // This now initiates the payment dialog
+            onDownload={handleInitiateDownload}
           />
         </div>
         
         <div className="w-full max-w-sm mx-auto space-y-4">
-          <div className="flex items-center justify-between p-3 bg-card rounded-lg">
+          <div className="flex items-center justify-between p-3 bg-card rounded-lg shadow-md">
               <p className="text-sm font-medium text-foreground flex items-center">
                 <Palette size={18} className="mr-2 text-primary"/>
                 Color Elementos Previsualización:
@@ -235,6 +236,7 @@ export default function HomePage() {
                   size="sm"
                   disabled={themeMode === 'dark'}
                   aria-label="Cambiar a elementos blancos (fondo oscuro previsualización)"
+                  className={themeMode === 'dark' ? 'border-primary text-primary' : ''}
                 >
                   Blancos
                 </Button>
@@ -244,6 +246,7 @@ export default function HomePage() {
                   size="sm"
                   disabled={themeMode === 'light'}
                   aria-label="Cambiar a elementos negros (fondo claro previsualización)"
+                   className={themeMode === 'light' ? 'border-primary text-primary' : ''}
                 >
                   Negros
                 </Button>
@@ -287,7 +290,7 @@ export default function HomePage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmPaymentAndDownload} className="bg-primary hover:bg-primary/90">
+            <AlertDialogAction onClick={handleConfirmPaymentAndDownload} className="bg-primary hover:bg-primary/90 text-primary-foreground">
               Pagar 0,99€ y Descargar
             </AlertDialogAction>
           </AlertDialogFooter>
