@@ -29,32 +29,8 @@ export default function HomePage() {
 
   const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null }>) => {
     setPreviewState(currentPreviewState => {
-      const updatedState = { ...currentPreviewState };
+      const updatedState = { ...currentPreviewState, ...newValues };
 
-      // Iterate over newValues keys to apply them more explicitly
-      for (const key in newValues) {
-        if (Object.prototype.hasOwnProperty.call(newValues, key)) {
-          const typedKey = key as keyof typeof newValues;
-          if (typedKey === 'coverImageUrl') {
-            updatedState.coverImageUrl = newValues.coverImageUrl;
-          } else if (typedKey === 'coverImageFile') {
-            updatedState.coverImageFile = newValues.coverImageFile;
-          } else if (typedKey === 'durationMinutes' || typedKey === 'durationSeconds' || typedKey === 'progressPercentage') {
-             // Handle number coercion for specific fields
-            const numValue = Number(newValues[typedKey]);
-            if (!isNaN(numValue)) {
-              (updatedState as any)[typedKey] = numValue;
-            } else {
-              // Fallback to current state's value if coercion fails
-              (updatedState as any)[typedKey] = currentPreviewState[typedKey];
-            }
-          } else {
-            // For other properties like songTitle, artistName
-            (updatedState as any)[typedKey] = newValues[typedKey];
-          }
-        }
-      }
-      
       // Ensure numeric fields are numbers, with fallbacks
       if (newValues.durationMinutes !== undefined) {
         updatedState.durationMinutes = isNaN(Number(newValues.durationMinutes)) ? currentPreviewState.durationMinutes : Number(newValues.durationMinutes);
@@ -65,24 +41,34 @@ export default function HomePage() {
       if (newValues.progressPercentage !== undefined) {
         updatedState.progressPercentage = isNaN(Number(newValues.progressPercentage)) ? currentPreviewState.progressPercentage : Number(newValues.progressPercentage);
       }
+      
+      // If coverImageFile is being cleared (e.g. by AI generation success), ensure coverImageUrl is also updated if needed.
+      // If newValues contains coverImageUrl, it takes precedence.
+      // If newValues explicitly sets coverImageFile to undefined (meaning AI generated or cleared),
+      // and no new coverImageUrl is provided by AI, we might need to revert to placeholder if newValues.coverImageUrl is also undefined/null.
+      // However, AI generation *provides* a coverImageUrl. User clearing the file input will also provide a new placeholder URL.
+      // So, this logic should largely be okay. The key is that if coverImageFile is changed, coverImageUrl MUST also be provided in newValues.
 
       return updatedState;
     });
   }, []);
+
 
   const handlePlayPauseToggle = useCallback(() => {
     setPreviewState(prevState => ({ ...prevState, isPlaying: !prevState.isPlaying }));
   }, []);
 
   useEffect(() => {
+    // This effect ensures that if coverImageUrl becomes empty or null for any reason
+    // (e.g. an error during AI generation or an unexpected state update),
+    // it reverts to the initial placeholder.
     if (!previewState.coverImageUrl) {
       setPreviewState(prevState => ({
         ...prevState,
-        coverImageUrl: initialFormValues.coverImageUrl 
+        coverImageUrl: initialFormValues.coverImageUrl
       }));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewState.coverImageUrl, initialFormValues.coverImageUrl]); // Added initialFormValues.coverImageUrl for completeness
+  }, [previewState.coverImageUrl, initialFormValues.coverImageUrl]);
 
   const handleDownload = useCallback(async () => {
     const elementToCapture = coverPreviewRef.current;
@@ -111,45 +97,48 @@ export default function HomePage() {
 
 
     try {
-      // Short delay to ensure all styles and images are rendered.
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       const canvas = await html2canvas(elementToCapture, {
-        allowTaint: true, 
-        useCORS: true,    
-        backgroundColor: null, 
-        width: elementToCapture.offsetWidth, 
-        height: elementToCapture.offsetHeight, 
-        scale: window.devicePixelRatio || 1, // Use devicePixelRatio for better quality
-        logging: false, 
-        imageTimeout: 30000, 
-        removeContainer: true, // Cleans up the cloned DOM element
-        scrollX: 0, 
-        scrollY: -window.scrollY, // Compensate for page scroll relative to viewport
+        allowTaint: true,
+        useCORS: true,
+        backgroundColor: null, // Crucial for transparency
+        width: elementToCapture.offsetWidth,
+        height: elementToCapture.offsetHeight,
+        scale: window.devicePixelRatio || 1,
+        logging: false,
+        imageTimeout: 30000,
+        removeContainer: true,
+        scrollX: 0,
+        scrollY: -window.scrollY,
         onclone: (documentClone) => {
+          // Force transparency on root elements of the cloned document
+          documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
+          documentClone.body.style.setProperty('background-color', 'transparent', 'important');
+
           const clonedCard = documentClone.getElementById('cover-preview-for-canvas');
           const clonedCardContent = documentClone.getElementById('card-content-for-canvas');
-          
+          const imageContainer = documentClone.getElementById('cover-image-container');
+
           if (clonedCard) {
-            clonedCard.style.backgroundColor = 'transparent';
-            clonedCard.style.boxShadow = 'none'; 
-            clonedCard.style.border = 'none'; 
+            clonedCard.style.setProperty('background-color', 'transparent', 'important');
+            clonedCard.style.boxShadow = 'none';
+            clonedCard.style.border = 'none';
           }
           if (clonedCardContent) {
-            clonedCardContent.style.backgroundColor = 'transparent';
+            clonedCardContent.style.setProperty('background-color', 'transparent', 'important');
           }
 
-          const imageContainer = documentClone.getElementById('cover-image-container');
           if (imageContainer) {
-            imageContainer.style.width = `${oicWidth}px`; // Use captured dimensions
-            imageContainer.style.height = `${oicHeight}px`; // Use captured dimensions
-            
-            // Ensure background styles are explicitly set for the clone
+            imageContainer.style.width = `${oicWidth}px`;
+            imageContainer.style.height = `${oicHeight}px`;
             imageContainer.style.backgroundSize = 'cover';
             imageContainer.style.backgroundPosition = 'center center';
             imageContainer.style.backgroundRepeat = 'no-repeat';
-            imageContainer.style.borderRadius = '0.375rem'; // Tailwind's rounded-md
-            imageContainer.style.overflow = 'hidden'; // Keep overflow hidden
+            imageContainer.style.borderRadius = '0.375rem';
+            imageContainer.style.overflow = 'hidden';
+            // Ensure the image container itself is transparent for the capture
+            imageContainer.style.setProperty('background-color', 'transparent', 'important');
           }
         },
       });
@@ -195,11 +184,11 @@ export default function HomePage() {
         <div className="w-full">
           <CoverForm
             onFormChange={handleFormChange}
-            initialValues={initialFormValues} // This provides default values to the form
+            initialValues={initialFormValues}
             onDownload={handleDownload}
           />
         </div>
-        
+
         <div className="w-full mt-8 flex justify-center">
           <CoverPreview
             ref={coverPreviewRef}
@@ -213,7 +202,7 @@ export default function HomePage() {
           />
         </div>
       </div>
-      
+
       <footer className="mt-12 text-center text-sm text-muted-foreground">
         <p>&copy; {new Date().getFullYear()} SpotOn Cover. Todos los derechos reservados (aplicación conceptual).</p>
         <p>Inspirado en la interfaz de usuario de Spotify. No afiliado a Spotify.</p>
