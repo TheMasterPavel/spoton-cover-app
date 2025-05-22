@@ -79,21 +79,34 @@ export default function HomePage() {
     }
 
     try {
-      // Aumentar la demora para asegurar que estilos, fuentes e imágenes se hayan renderizado completamente
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Aumentado a 1000ms
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true, 
         useCORS: true,    
-        backgroundColor: null, // Dejar que el fondo del elemento se use
+        backgroundColor: null, // Crucial for transparency
         width: elementToCapture.offsetWidth, 
         height: elementToCapture.offsetHeight, 
-        scale: 1, // Mantener escala 1 para depurar problemas de diseño primero
+        scale: window.devicePixelRatio || 1, // For better image quality
         logging: true, 
-        imageTimeout: 20000, // Aumentar tiempo de espera para imágenes
+        imageTimeout: 20000, 
         removeContainer: true,
-        scrollX: 0, // Asegurar que la captura empiece en el origen del elemento
+        scrollX: 0, 
         scrollY: 0,
+        onclone: (documentClone) => {
+          const clonedCard = documentClone.getElementById('cover-preview-for-canvas');
+          const clonedCardContent = documentClone.getElementById('card-content-for-canvas');
+          
+          if (clonedCard) {
+            clonedCard.style.backgroundColor = 'transparent';
+            clonedCard.style.boxShadow = 'none'; // Remove shadow for cleaner transparent edge
+            clonedCard.style.border = 'none'; // Ensure no border is captured
+          }
+          if (clonedCardContent) {
+            // CardContent also might have its own background, make it transparent
+            clonedCardContent.style.backgroundColor = 'transparent';
+          }
+        },
       });
       const imageMimeType = 'image/png';
       const imageUrlToDownload = canvas.toDataURL(imageMimeType);

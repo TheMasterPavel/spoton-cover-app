@@ -36,11 +36,13 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
     return (
       <Card
         ref={ref}
+        id="cover-preview-for-canvas" // ID for html2canvas cloning
         className="w-full max-w-sm bg-card shadow-xl border-none rounded-lg overflow-hidden"
-        // Añadir un ID puede ser útil para depurar `html2canvas` si es necesario seleccionarlo en onclone
-        // id="cover-preview-card" 
       >
-        <CardContent className="p-6 flex flex-col items-center space-y-6 bg-card"> {/* Asegurar que CardContent también tenga fondo si es necesario */}
+        <CardContent 
+          id="card-content-for-canvas" // ID for html2canvas cloning
+          className="p-6 flex flex-col items-center space-y-6 bg-card"
+        >
           <div className="relative w-full aspect-square rounded-md overflow-hidden shadow-lg">
             {imageUrl ? (
               <Image
@@ -50,8 +52,8 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
                 objectFit="cover"
                 className="rounded-md"
                 data-ai-hint="album cover"
-                priority // Cargar la imagen con prioridad para html2canvas
-                unoptimized // Ayuda a html2canvas a obtener la imagen fuente más fácilmente
+                priority 
+                unoptimized 
               />
             ) : (
               <div className="w-full h-full bg-muted flex items-center justify-center rounded-md" data-ai-hint="abstract music">
@@ -60,7 +62,7 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
             )}
           </div>
 
-          <div className="w-full text-center">
+          <div className="w-full text-left"> {/* Changed text-center to text-left */}
             <h2 className="text-2xl font-bold text-foreground" title={songTitle || "Título de la Canción"}>
               {songTitle || 'Título de la Canción'}
             </h2>
