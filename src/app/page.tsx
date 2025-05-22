@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { CoverForm } from '@/components/CoverForm';
 import { CoverPreview } from '@/components/CoverPreview';
 import type { CoverFormValues } from '@/lib/schema';
-import { Music2, ShieldCheck } from 'lucide-react';
+import { Music2, ShieldCheck, Moon, Sun } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import {
@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from '@/components/ui/button';
 
 const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   songTitle: 'Melodía Increíble',
@@ -37,12 +38,12 @@ export default function HomePage() {
   });
   const coverPreviewRef = useRef<HTMLDivElement>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
   const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => {
     setPreviewState(currentPreviewState => {
       const updatedState = { ...currentPreviewState };
 
-      // Merge known properties carefully
       if (newValues.songTitle !== undefined) updatedState.songTitle = newValues.songTitle;
       if (newValues.artistName !== undefined) updatedState.artistName = newValues.artistName;
       if (newValues.durationMinutes !== undefined) {
@@ -55,11 +56,10 @@ export default function HomePage() {
         updatedState.progressPercentage = isNaN(Number(newValues.progressPercentage)) ? currentPreviewState.progressPercentage : Number(newValues.progressPercentage);
       }
 
-      // Handle image updates explicitly
-      if (newValues.hasOwnProperty('coverImageFile')) { // Check if coverImageFile is explicitly being set (even to undefined)
+      if (newValues.hasOwnProperty('coverImageFile')) {
         updatedState.coverImageFile = newValues.coverImageFile;
       }
-      if (newValues.hasOwnProperty('coverImageUrl')) { // Check if coverImageUrl is explicitly being set
+      if (newValues.hasOwnProperty('coverImageUrl')) {
         updatedState.coverImageUrl = newValues.coverImageUrl;
       }
       
@@ -73,13 +73,13 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!previewState.coverImageUrl) {
+    if (!previewState.coverImageUrl && !previewState.coverImageFile) { // Only reset to placeholder if no file and no URL
       setPreviewState(prevState => ({
         ...prevState,
         coverImageUrl: initialFormValues.coverImageUrl
       }));
     }
-  }, [previewState.coverImageUrl, initialFormValues.coverImageUrl]);
+  }, [previewState.coverImageUrl, previewState.coverImageFile, initialFormValues.coverImageUrl]);
 
   const captureAndDownloadCover = useCallback(async () => {
     const elementToCapture = coverPreviewRef.current;
@@ -107,19 +107,19 @@ export default function HomePage() {
     const oicHeight = originalImageContainer.offsetHeight;
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 500)); // Shorter delay, ensure necessary elements are rendered
+      await new Promise(resolve => setTimeout(resolve, 500)); 
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null,
+        backgroundColor: null, 
         width: elementToCapture.offsetWidth,
         height: elementToCapture.offsetHeight,
         scale: window.devicePixelRatio || 1,
-        logging: false, // Set to true for debugging if needed
+        logging: false,
         imageTimeout: 15000,
         scrollX: 0,
-        scrollY: -window.scrollY, // Capture relative to the element, not window scroll
+        scrollY: -window.scrollY,
         onclone: (documentClone) => {
           documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
           documentClone.body.style.setProperty('background-color', 'transparent', 'important');
@@ -141,12 +141,13 @@ export default function HomePage() {
           if (imageContainerClone) {
             imageContainerClone.style.width = `${oicWidth}px`;
             imageContainerClone.style.height = `${oicHeight}px`;
+            // background-image is already set via style prop in CoverPreview
             imageContainerClone.style.backgroundSize = 'cover';
             imageContainerClone.style.backgroundPosition = 'center center';
             imageContainerClone.style.backgroundRepeat = 'no-repeat';
-            imageContainerClone.style.borderRadius = '0.375rem'; // Tailwind 'rounded-md'
+            imageContainerClone.style.borderRadius = '0.375rem'; 
             imageContainerClone.style.overflow = 'hidden';
-            imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
+            imageContainerClone.style.setProperty('background-color', 'transparent', 'important'); // For the placeholder case
           }
         },
       });
@@ -177,20 +178,22 @@ export default function HomePage() {
   }, [toast]);
 
   const handleInitiateDownload = () => {
-    // Open the payment dialog instead of downloading directly
     setIsPaymentDialogOpen(true);
   };
 
   const handleConfirmPaymentAndDownload = () => {
     setIsPaymentDialogOpen(false);
-    // Simulate payment success and proceed to download
     toast({
       title: "Pago Confirmado (Simulado)",
       description: "Gracias por tu compra. Iniciando descarga...",
-      className: "bg-green-600 text-white", // Custom styling for success
+      className: "bg-green-600 text-white",
       duration: 3000,
     });
     captureAndDownloadCover();
+  };
+
+  const toggleThemeMode = () => {
+    setThemeMode(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
   const totalDurationSeconds = (previewState.durationMinutes * 60) + previewState.durationSeconds;
@@ -206,11 +209,16 @@ export default function HomePage() {
       </header>
 
       <div className="flex flex-col items-center gap-8 lg:gap-12 w-full max-w-3xl px-4">
+        <Button onClick={toggleThemeMode} variant="outline" className="w-full max-w-xs mx-auto">
+          {themeMode === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+          Cambiar a Modo {themeMode === 'dark' ? 'Claro' : 'Oscuro'}
+        </Button>
+
         <div className="w-full">
           <CoverForm
             onFormChange={handleFormChange}
             initialValues={initialFormValues}
-            onDownload={handleInitiateDownload} // This will now open the payment dialog
+            onDownload={handleInitiateDownload}
           />
         </div>
 
@@ -224,6 +232,7 @@ export default function HomePage() {
             progressPercentage={previewState.progressPercentage}
             isPlaying={previewState.isPlaying}
             onPlayPauseToggle={handlePlayPauseToggle}
+            themeMode={themeMode}
           />
         </div>
       </div>

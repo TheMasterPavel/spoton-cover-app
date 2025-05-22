@@ -1,21 +1,22 @@
 
 'use client';
 import React from 'react';
-// Removed Image from 'next/image'
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Shuffle, SkipBack, Play, Pause, SkipForward, Repeat } from 'lucide-react';
 import { formatTime } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface CoverPreviewProps {
   songTitle: string;
   artistName: string;
   imageUrl?: string | null;
-  durationSeconds: number; // Total duration in seconds
-  progressPercentage: number; // Current progress as a percentage (0-100)
+  durationSeconds: number;
+  progressPercentage: number;
   isPlaying: boolean;
   onPlayPauseToggle: () => void;
+  themeMode: 'dark' | 'light';
 }
 
 export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
@@ -28,24 +29,32 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
       progressPercentage,
       isPlaying,
       onPlayPauseToggle,
+      themeMode,
     },
     ref
   ) => {
     const currentTimeSeconds = (progressPercentage / 100) * durationSeconds;
 
+    const textColor = themeMode === 'light' ? 'text-background' : 'text-foreground';
+    const mutedTextColor = themeMode === 'light' ? 'text-neutral-600' : 'text-muted-foreground';
+    const iconColor = themeMode === 'light' ? 'text-background hover:text-neutral-700' : 'text-muted-foreground hover:text-foreground';
+    const playButtonBg = themeMode === 'light' ? 'bg-background text-foreground hover:bg-neutral-800' : 'bg-foreground text-background hover:bg-foreground/90';
+    const playButtonIconFill = themeMode === 'light' ? 'fill-foreground' : 'fill-background';
+    const placeholderIconColor = themeMode === 'light' ? 'text-neutral-400/80' : 'text-muted-foreground/50';
+
     return (
       <Card
         ref={ref}
-        id="cover-preview-for-canvas" // ID for html2canvas cloning
+        id="cover-preview-for-canvas"
         className="w-full max-w-sm bg-card shadow-xl border-none rounded-lg overflow-hidden"
       >
         <CardContent 
-          id="card-content-for-canvas" // ID for html2canvas cloning
+          id="card-content-for-canvas"
           className="p-6 flex flex-col items-center space-y-6 bg-card"
         >
           <div 
             id="cover-image-container"
-            className="w-full aspect-square rounded-md overflow-hidden shadow-lg bg-muted flex items-center justify-center" // Added flex items-center justify-center for placeholder
+            className="w-full aspect-square rounded-md overflow-hidden shadow-lg bg-muted flex items-center justify-center"
             style={imageUrl ? {
               backgroundImage: `url(${imageUrl})`,
               backgroundSize: 'cover',
@@ -55,16 +64,15 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
             data-ai-hint={imageUrl ? "album cover" : "abstract music"}
           >
             {!imageUrl && (
-              // SVG placeholder is now a direct child, centered by parent's flex properties
-              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-music text-muted-foreground/50"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("lucide lucide-music", placeholderIconColor)}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
             )}
           </div>
 
           <div className="w-full text-left">
-            <h2 className="text-2xl font-bold text-foreground">
+            <h2 className={cn("text-2xl font-bold", textColor)}>
               {songTitle || 'Título de la Canción'}
             </h2>
-            <p className="text-muted-foreground text-sm">
+            <p className={cn("text-sm", mutedTextColor)}>
               {artistName || 'Nombre del Artista'}
             </p>
           </div>
@@ -74,36 +82,37 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
               value={[progressPercentage]}
               max={100}
               step={1}
-              className="w-full [&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green"
+              themeMode={themeMode} // Pass themeMode to Slider
+              className="w-full" // Removed old complex Tailwind classes for slider
               aria-label="Progreso de la canción"
               disabled
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
+            <div className={cn("flex justify-between text-xs", mutedTextColor)}>
               <span>{formatTime(currentTimeSeconds)}</span>
               <span>{formatTime(durationSeconds)}</span>
             </div>
           </div>
 
           <div className="flex items-center justify-around w-full space-x-2">
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="icon" className={iconColor}>
               <Shuffle size={20} />
             </Button>
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="icon" className={iconColor}>
               <SkipBack size={24} />
             </Button>
             <Button
               variant="default"
               size="icon"
-              className="bg-foreground text-background hover:bg-foreground/90 rounded-full h-12 w-12"
+              className={cn("rounded-full h-12 w-12", playButtonBg)}
               onClick={onPlayPauseToggle}
               aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
             >
-              {isPlaying ? <Pause size={28} className="fill-background" /> : <Play size={28} className="fill-background" />}
+              {isPlaying ? <Pause size={28} className={playButtonIconFill} /> : <Play size={28} className={playButtonIconFill} />}
             </Button>
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="icon" className={iconColor}>
               <SkipForward size={24} />
             </Button>
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="icon" className={iconColor}>
               <Repeat size={20} />
             </Button>
           </div>
