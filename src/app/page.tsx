@@ -78,6 +78,21 @@ export default function HomePage() {
       return;
     }
 
+    // Capturar las dimensiones del contenedor de imagen del DOM original (vivo)
+    const originalImageContainer = elementToCapture.querySelector<HTMLDivElement>('#cover-image-container');
+    if (!originalImageContainer) {
+      toast({
+        title: 'Error de Descarga',
+        description: 'No se pudo encontrar el sub-elemento contenedor de la imagen original.',
+        variant: 'destructive',
+        duration: 4000,
+      });
+      return;
+    }
+    const oicWidth = originalImageContainer.offsetWidth;
+    const oicHeight = originalImageContainer.offsetHeight;
+
+
     try {
       // Pequeña demora para asegurar que la imagen y fuentes estén cargadas
       await new Promise(resolve => setTimeout(resolve, 1500)); 
@@ -90,15 +105,13 @@ export default function HomePage() {
         height: elementToCapture.offsetHeight, 
         scale: window.devicePixelRatio || 1, 
         logging: true, 
-        imageTimeout: 30000, // Aumentado tiempo de espera para imágenes
+        imageTimeout: 30000, 
         removeContainer: true,
         scrollX: 0, 
-        scrollY: -window.scrollY, // Corregir por el scroll de la página
+        scrollY: -window.scrollY, 
         onclone: (documentClone) => {
           const clonedCard = documentClone.getElementById('cover-preview-for-canvas');
           const clonedCardContent = documentClone.getElementById('card-content-for-canvas');
-          const imageContainer = documentClone.getElementById('cover-image-container');
-          const imageElement = imageContainer?.querySelector('img') as HTMLImageElement | null;
           
           if (clonedCard) {
             clonedCard.style.backgroundColor = 'transparent';
@@ -108,15 +121,19 @@ export default function HomePage() {
           if (clonedCardContent) {
             clonedCardContent.style.backgroundColor = 'transparent';
           }
+
+          const imageContainer = documentClone.getElementById('cover-image-container');
+          const imageElement = imageContainer?.querySelector('img') as HTMLImageElement | null;
+          
           if (imageContainer && imageElement) {
-            // Forzar estilos en el contenedor de la imagen
+            // Forzar estilos en el contenedor de la imagen CLONADO usando dimensiones del ORIGINAL
             imageContainer.style.position = 'relative';
-            imageContainer.style.width = imageContainer.offsetWidth + 'px'; // Usar dimensiones actuales
-            imageContainer.style.height = imageContainer.offsetHeight + 'px'; // Usar dimensiones actuales
+            imageContainer.style.width = `${oicWidth}px`; // Usar dimensiones capturadas del original
+            imageContainer.style.height = `${oicHeight}px`; // Usar dimensiones capturadas del original
             imageContainer.style.overflow = 'hidden';
             imageContainer.style.borderRadius = '0.375rem'; // Equivalente a rounded-md
 
-            // Forzar estilos en la imagen misma para simular layout="fill" y objectFit="cover"
+            // Forzar estilos en la imagen CLONADA misma para simular layout="fill" y objectFit="cover"
             imageElement.style.position = 'absolute';
             imageElement.style.top = '0';
             imageElement.style.left = '0';
