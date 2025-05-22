@@ -5,15 +5,25 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { CoverForm } from '@/components/CoverForm';
 import { CoverPreview } from '@/components/CoverPreview';
 import type { CoverFormValues } from '@/lib/schema';
-import { Music2 } from 'lucide-react';
+import { Music2, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   songTitle: 'Melodía Increíble',
   artistName: 'Los Gatos Geniales',
   coverImageFile: undefined,
-  coverImageUrl: 'https://placehold.co/600x600.png', // Default placeholder
+  coverImageUrl: 'https://placehold.co/600x600.png',
   durationMinutes: 3,
   durationSeconds: 30,
   progressPercentage: 40,
@@ -26,12 +36,15 @@ export default function HomePage() {
     isPlaying: false,
   });
   const coverPreviewRef = useRef<HTMLDivElement>(null);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
 
-  const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null }>) => {
+  const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => {
     setPreviewState(currentPreviewState => {
-      const updatedState = { ...currentPreviewState, ...newValues };
+      const updatedState = { ...currentPreviewState };
 
-      // Ensure numeric fields are numbers, with fallbacks
+      // Merge known properties carefully
+      if (newValues.songTitle !== undefined) updatedState.songTitle = newValues.songTitle;
+      if (newValues.artistName !== undefined) updatedState.artistName = newValues.artistName;
       if (newValues.durationMinutes !== undefined) {
         updatedState.durationMinutes = isNaN(Number(newValues.durationMinutes)) ? currentPreviewState.durationMinutes : Number(newValues.durationMinutes);
       }
@@ -41,14 +54,15 @@ export default function HomePage() {
       if (newValues.progressPercentage !== undefined) {
         updatedState.progressPercentage = isNaN(Number(newValues.progressPercentage)) ? currentPreviewState.progressPercentage : Number(newValues.progressPercentage);
       }
-      
-      // If coverImageFile is being cleared (e.g. by AI generation success), ensure coverImageUrl is also updated if needed.
-      // If newValues contains coverImageUrl, it takes precedence.
-      // If newValues explicitly sets coverImageFile to undefined (meaning AI generated or cleared),
-      // and no new coverImageUrl is provided by AI, we might need to revert to placeholder if newValues.coverImageUrl is also undefined/null.
-      // However, AI generation *provides* a coverImageUrl. User clearing the file input will also provide a new placeholder URL.
-      // So, this logic should largely be okay. The key is that if coverImageFile is changed, coverImageUrl MUST also be provided in newValues.
 
+      // Handle image updates explicitly
+      if (newValues.hasOwnProperty('coverImageFile')) { // Check if coverImageFile is explicitly being set (even to undefined)
+        updatedState.coverImageFile = newValues.coverImageFile;
+      }
+      if (newValues.hasOwnProperty('coverImageUrl')) { // Check if coverImageUrl is explicitly being set
+        updatedState.coverImageUrl = newValues.coverImageUrl;
+      }
+      
       return updatedState;
     });
   }, []);
@@ -59,9 +73,6 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    // This effect ensures that if coverImageUrl becomes empty or null for any reason
-    // (e.g. an error during AI generation or an unexpected state update),
-    // it reverts to the initial placeholder.
     if (!previewState.coverImageUrl) {
       setPreviewState(prevState => ({
         ...prevState,
@@ -70,7 +81,7 @@ export default function HomePage() {
     }
   }, [previewState.coverImageUrl, initialFormValues.coverImageUrl]);
 
-  const handleDownload = useCallback(async () => {
+  const captureAndDownloadCover = useCallback(async () => {
     const elementToCapture = coverPreviewRef.current;
     if (!elementToCapture) {
       toast({
@@ -95,50 +106,47 @@ export default function HomePage() {
     const oicWidth = originalImageContainer.offsetWidth;
     const oicHeight = originalImageContainer.offsetHeight;
 
-
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 500)); // Shorter delay, ensure necessary elements are rendered
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null, // Crucial for transparency
+        backgroundColor: null,
         width: elementToCapture.offsetWidth,
         height: elementToCapture.offsetHeight,
         scale: window.devicePixelRatio || 1,
-        logging: false,
-        imageTimeout: 30000,
-        removeContainer: true,
+        logging: false, // Set to true for debugging if needed
+        imageTimeout: 15000,
         scrollX: 0,
-        scrollY: -window.scrollY,
+        scrollY: -window.scrollY, // Capture relative to the element, not window scroll
         onclone: (documentClone) => {
-          // Force transparency on root elements of the cloned document
           documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
           documentClone.body.style.setProperty('background-color', 'transparent', 'important');
-
+          
           const clonedCard = documentClone.getElementById('cover-preview-for-canvas');
           const clonedCardContent = documentClone.getElementById('card-content-for-canvas');
-          const imageContainer = documentClone.getElementById('cover-image-container');
+          const imageContainerClone = documentClone.getElementById('cover-image-container');
 
           if (clonedCard) {
             clonedCard.style.setProperty('background-color', 'transparent', 'important');
+            clonedCard.style.setProperty('background', 'transparent', 'important');
             clonedCard.style.boxShadow = 'none';
             clonedCard.style.border = 'none';
           }
           if (clonedCardContent) {
             clonedCardContent.style.setProperty('background-color', 'transparent', 'important');
+            clonedCardContent.style.setProperty('background', 'transparent', 'important');
           }
-
-          if (imageContainer) {
-            imageContainer.style.width = `${oicWidth}px`;
-            imageContainer.style.height = `${oicHeight}px`;
-            imageContainer.style.backgroundSize = 'cover';
-            imageContainer.style.backgroundPosition = 'center center';
-            imageContainer.style.backgroundRepeat = 'no-repeat';
-            imageContainer.style.borderRadius = '0.375rem';
-            imageContainer.style.overflow = 'hidden';
-            // Ensure the image container itself is transparent for the capture
-            imageContainer.style.setProperty('background-color', 'transparent', 'important');
+          if (imageContainerClone) {
+            imageContainerClone.style.width = `${oicWidth}px`;
+            imageContainerClone.style.height = `${oicHeight}px`;
+            imageContainerClone.style.backgroundSize = 'cover';
+            imageContainerClone.style.backgroundPosition = 'center center';
+            imageContainerClone.style.backgroundRepeat = 'no-repeat';
+            imageContainerClone.style.borderRadius = '0.375rem'; // Tailwind 'rounded-md'
+            imageContainerClone.style.overflow = 'hidden';
+            imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
           }
         },
       });
@@ -168,6 +176,23 @@ export default function HomePage() {
     }
   }, [toast]);
 
+  const handleInitiateDownload = () => {
+    // Open the payment dialog instead of downloading directly
+    setIsPaymentDialogOpen(true);
+  };
+
+  const handleConfirmPaymentAndDownload = () => {
+    setIsPaymentDialogOpen(false);
+    // Simulate payment success and proceed to download
+    toast({
+      title: "Pago Confirmado (Simulado)",
+      description: "Gracias por tu compra. Iniciando descarga...",
+      className: "bg-green-600 text-white", // Custom styling for success
+      duration: 3000,
+    });
+    captureAndDownloadCover();
+  };
+
   const totalDurationSeconds = (previewState.durationMinutes * 60) + previewState.durationSeconds;
 
   return (
@@ -185,7 +210,7 @@ export default function HomePage() {
           <CoverForm
             onFormChange={handleFormChange}
             initialValues={initialFormValues}
-            onDownload={handleDownload}
+            onDownload={handleInitiateDownload} // This will now open the payment dialog
           />
         </div>
 
@@ -207,6 +232,27 @@ export default function HomePage() {
         <p>&copy; {new Date().getFullYear()} SpotOn Cover. Todos los derechos reservados (aplicación conceptual).</p>
         <p>Inspirado en la interfaz de usuario de Spotify. No afiliado a Spotify.</p>
       </footer>
+
+      <AlertDialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+              <ShieldCheck className="mr-2 h-5 w-5 text-primary" />
+              Confirmar Compra
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de adquirir tu portada personalizada por un precio único de <strong>0,99€</strong>.
+              Este es un pago simulado para demostración.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmPaymentAndDownload} className="bg-primary hover:bg-primary/90">
+              Pagar 0,99€ y Descargar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

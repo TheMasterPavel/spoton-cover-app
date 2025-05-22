@@ -2,23 +2,22 @@
 'use client';
 
 import type { ChangeEvent } from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Added useEffect
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CoverFormSchema, type CoverFormValues } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// Label no se usa directamente, pero es referenciado por FormLabel
 import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { generateAlbumCoverAction } from '@/lib/actions';
-import { Loader2, Sparkles, Download, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, CreditCard, Trash2 } from 'lucide-react'; // Changed Download to CreditCard
 import React from 'react';
 
 interface CoverFormProps {
   onFormChange: (values: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => void;
-  initialValues: CoverFormValues & { coverImageUrl?: string | null }; // Used for reset and initial RHF values
+  initialValues: CoverFormValues & { coverImageUrl?: string | null };
   onDownload: () => void;
 }
 
@@ -28,7 +27,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
 
   const form = useForm<CoverFormValues>({
     resolver: zodResolver(CoverFormSchema),
-    defaultValues: { // RHF gets its initial structure from here
+    defaultValues: {
       songTitle: initialValues.songTitle,
       artistName: initialValues.artistName,
       coverImageFile: initialValues.coverImageFile,
@@ -40,17 +39,20 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
 
   const { watch, setValue, reset, getValues } = form;
 
-  React.useEffect(() => {
-    const subscription = watch((formStateFromRHF, { name }) => {
-      // coverImageFile changes are handled by its own input onChange -> handleImageUpload
-      // which directly calls onFormChange with coverImageUrl and coverImageFile.
-      // So, we only need to call onFormChange here for other field changes.
+  useEffect(() => {
+    const subscription = watch((formStateFromRHF, { name, type }) => {
+      // Only propagate changes for fields other than coverImageFile here,
+      // as coverImageFile changes are handled by handleImageUpload which calls onFormChange directly.
       if (name !== 'coverImageFile') {
-        // For other fields (songTitle, artistName, durations, progress),
-        // send up their current state from RHF.
-        // Exclude coverImageFile from this update path, as it's handled by handleImageUpload.
         const { coverImageFile, ...otherRelevantState } = formStateFromRHF;
-        onFormChange(otherRelevantState);
+         // Ensure we pass the specific field that changed, not the whole formState
+         // as that could inadvertently reset coverImageUrl or coverImageFile in parent
+        if (name && otherRelevantState.hasOwnProperty(name)) {
+          onFormChange({ [name]: otherRelevantState[name as keyof typeof otherRelevantState] });
+        } else {
+          // Fallback for broader changes, though less ideal
+          onFormChange(otherRelevantState);
+        }
       }
     });
     return () => subscription.unsubscribe();
@@ -62,20 +64,18 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        // Send both the new image URL for preview and the file itself for RHF & state
         onFormChange({ coverImageFile: event.target.files, coverImageUrl: reader.result as string });
-        setValue('coverImageFile', event.target.files, { shouldValidate: true }); // Update RHF
+        setValue('coverImageFile', event.target.files, { shouldValidate: true });
       };
       reader.readAsDataURL(file);
     } else {
-      // If file is cleared, reset to placeholder and clear file in RHF
       onFormChange({ coverImageFile: undefined, coverImageUrl: initialValues.coverImageUrl });
       setValue('coverImageFile', undefined);
     }
   };
 
   const handleGenerateAiCover = async () => {
-    const { songTitle, artistName } = getValues(); 
+    const { songTitle, artistName } = getValues();
     if (!songTitle || !artistName) {
       toast({
         title: 'Información Faltante',
@@ -90,9 +90,8 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
     try {
       const result = await generateAlbumCoverAction({ songTitle, artistName });
       if (result.albumCoverDataUri && result.albumCoverDataUri.startsWith('data:image')) {
-        // AI generated an image, clear any user-uploaded file.
         onFormChange({ coverImageUrl: result.albumCoverDataUri, coverImageFile: undefined });
-        setValue('coverImageFile', undefined); // Clear file from RHF
+        setValue('coverImageFile', undefined);
         toast({
           title: '¡Portada IA Generada!',
           description: 'La IA ha creado una portada única para ti.',
@@ -109,34 +108,40 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
         variant: 'destructive',
         duration: 5000,
       });
-      // On failure, revert to initial placeholder. Don't clear coverImageFile if user had one before trying AI.
-      onFormChange({ coverImageUrl: initialValues.coverImageUrl }); 
+      // Revert to placeholder only if no user file was present before AI attempt
+      if (!getValues('coverImageFile')) {
+         onFormChange({ coverImageUrl: initialValues.coverImageUrl });
+      }
     } finally {
       setIsGeneratingAi(false);
     }
   };
 
   const handleResetForm = () => {
-    reset({ // Reset RHF to initial values
+    reset({
       songTitle: initialValues.songTitle,
       artistName: initialValues.artistName,
-      coverImageFile: initialValues.coverImageFile, // usually undefined
+      coverImageFile: initialValues.coverImageFile,
       durationMinutes: initialValues.durationMinutes,
       durationSeconds: initialValues.durationSeconds,
       progressPercentage: initialValues.progressPercentage,
-    }); 
-    // Also reset HomePage state (including coverImageUrl)
-    onFormChange({ ...initialValues, coverImageUrl: initialValues.coverImageUrl }); 
+    });
+    // Ensure the visual preview and file state in HomePage are also reset
+    onFormChange({ 
+      ...initialValues, // Send all initial values
+      coverImageUrl: initialValues.coverImageUrl, // Explicitly send initial image URL
+      coverImageFile: undefined // Explicitly clear any file
+    });
   };
 
-  const onSubmit = () => {
-    onDownload(); // HomePage's onDownload uses its own previewState
+  const onSubmitTriggerPayment = () => { // Renamed from onSubmit to clarify action
+    onDownload(); // This now triggers the payment dialog in HomePage
   };
 
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 p-4 md:p-6 rounded-lg shadow-lg bg-card w-full">
+        <form onSubmit={form.handleSubmit(onSubmitTriggerPayment)} className="space-y-6 p-4 md:p-6 rounded-lg shadow-lg bg-card w-full">
           <FormField
             control={form.control}
             name="songTitle"
@@ -172,8 +177,6 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
                 id="coverImageFile-input"
                 type="file" 
                 accept="image/png, image/jpeg, image/webp"
-                // RHF's setValue is called within handleImageUpload for the 'coverImageFile' field.
-                // So we don't use field.onChange here.
                 onChange={handleImageUpload}
                 className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
               />
@@ -200,7 +203,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
                 <FormItem>
                   <FormLabel>Duración (Min)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="MM" {...field} value={field.value ?? ''} onChange={e => field.onChange(parseInt(e.target.value,10))} min="0" max="599" className="bg-input text-foreground placeholder:text-muted-foreground/70"/>
+                    <Input type="number" placeholder="MM" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} min="0" max="599" className="bg-input text-foreground placeholder:text-muted-foreground/70"/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -213,7 +216,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
                 <FormItem>
                   <FormLabel>Duración (Seg)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="SS" {...field} value={field.value ?? ''} onChange={e => field.onChange(parseInt(e.target.value,10))} min="0" max="59" className="bg-input text-foreground placeholder:text-muted-foreground/70"/>
+                    <Input type="number" placeholder="SS" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} min="0" max="59" className="bg-input text-foreground placeholder:text-muted-foreground/70"/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -230,10 +233,10 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
                 <FormControl>
                    <Slider
                     value={[value !== undefined && value !== null ? value : 0]}
-                    onValueChange={(vals) => onChange(vals[0])} // RHF onChange handles the number
+                    onValueChange={(vals) => onChange(vals[0])}
                     max={100}
                     step={1}
-                    className="[&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green" // Assuming --spotify-green is a valid CSS var or this is Tailwind JIT
+                    className="[&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green"
                     aria-label="Porcentaje de progreso de la canción"
                     {...restField}
                   />
@@ -248,7 +251,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload }: CoverForm
               <Trash2 className="mr-2 h-4 w-4" /> Reiniciar
             </Button>
             <Button type="submit" className="w-full flex-grow bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Download className="mr-2 h-4 w-4" /> Descargar Portada
+              <CreditCard className="mr-2 h-4 w-4" /> Pagar 0,99€ y Descargar
             </Button>
           </div>
         </form>
