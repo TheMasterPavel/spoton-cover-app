@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { CoverForm } from '@/components/CoverForm';
 import { CoverPreview } from '@/components/CoverPreview';
 import type { CoverFormValues } from '@/lib/schema';
-import { Music2, ShieldCheck, Moon, Sun } from 'lucide-react';
+import { Music2, ShieldCheck, Palette } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import {
@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 
 const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   songTitle: 'Melodía Increíble',
@@ -38,7 +39,7 @@ export default function HomePage() {
   });
   const coverPreviewRef = useRef<HTMLDivElement>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark'); // 'dark' = elementos blancos, 'light' = elementos negros
 
   const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => {
     setPreviewState(currentPreviewState => {
@@ -55,7 +56,8 @@ export default function HomePage() {
       if (newValues.progressPercentage !== undefined) {
         updatedState.progressPercentage = isNaN(Number(newValues.progressPercentage)) ? currentPreviewState.progressPercentage : Number(newValues.progressPercentage);
       }
-
+      
+      // Solo actualiza la imagen si se proporciona explícitamente en newValues
       if (newValues.hasOwnProperty('coverImageFile')) {
         updatedState.coverImageFile = newValues.coverImageFile;
       }
@@ -73,7 +75,9 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!previewState.coverImageUrl && !previewState.coverImageFile) { // Only reset to placeholder if no file and no URL
+    // Si no hay URL de imagen Y no hay archivo de imagen, Y los valores iniciales tenían una URL, resetea a la URL inicial.
+    // Esto es para que al borrar un archivo subido, se vuelva al placeholder si no hay IA.
+    if (!previewState.coverImageUrl && !previewState.coverImageFile && initialFormValues.coverImageUrl) { 
       setPreviewState(prevState => ({
         ...prevState,
         coverImageUrl: initialFormValues.coverImageUrl
@@ -119,8 +123,9 @@ export default function HomePage() {
         logging: false,
         imageTimeout: 15000,
         scrollX: 0,
-        scrollY: -window.scrollY,
+        scrollY: -window.scrollY, // Ajusta para el scroll de la página
         onclone: (documentClone) => {
+          // Forzar fondo transparente en los elementos principales del clon
           documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
           documentClone.body.style.setProperty('background-color', 'transparent', 'important');
           
@@ -130,24 +135,24 @@ export default function HomePage() {
 
           if (clonedCard) {
             clonedCard.style.setProperty('background-color', 'transparent', 'important');
-            clonedCard.style.setProperty('background', 'transparent', 'important');
+            clonedCard.style.setProperty('background', 'transparent', 'important'); // Añadido por si acaso
             clonedCard.style.boxShadow = 'none';
             clonedCard.style.border = 'none';
           }
           if (clonedCardContent) {
             clonedCardContent.style.setProperty('background-color', 'transparent', 'important');
-            clonedCardContent.style.setProperty('background', 'transparent', 'important');
+            clonedCardContent.style.setProperty('background', 'transparent', 'important'); // Añadido por si acaso
           }
           if (imageContainerClone) {
             imageContainerClone.style.width = `${oicWidth}px`;
             imageContainerClone.style.height = `${oicHeight}px`;
-            // background-image is already set via style prop in CoverPreview
+            // El background-image ya se aplica a través de la prop 'style' en CoverPreview
             imageContainerClone.style.backgroundSize = 'cover';
             imageContainerClone.style.backgroundPosition = 'center center';
             imageContainerClone.style.backgroundRepeat = 'no-repeat';
-            imageContainerClone.style.borderRadius = '0.375rem'; 
-            imageContainerClone.style.overflow = 'hidden';
-            imageContainerClone.style.setProperty('background-color', 'transparent', 'important'); // For the placeholder case
+            imageContainerClone.style.borderRadius = '0.375rem'; // md
+            imageContainerClone.style.overflow = 'hidden'; // Para asegurar esquinas redondeadas si la imagen es más grande
+            imageContainerClone.style.setProperty('background-color', 'transparent', 'important'); // Para el caso del placeholder SVG
           }
         },
       });
@@ -192,10 +197,6 @@ export default function HomePage() {
     captureAndDownloadCover();
   };
 
-  const toggleThemeMode = () => {
-    setThemeMode(prev => prev === 'dark' ? 'light' : 'dark');
-  };
-
   const totalDurationSeconds = (previewState.durationMinutes * 60) + previewState.durationSeconds;
 
   return (
@@ -209,11 +210,7 @@ export default function HomePage() {
       </header>
 
       <div className="flex flex-col items-center gap-8 lg:gap-12 w-full max-w-3xl px-4">
-        <Button onClick={toggleThemeMode} variant="outline" className="w-full max-w-xs mx-auto">
-          {themeMode === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-          Cambiar a Modo {themeMode === 'dark' ? 'Claro' : 'Oscuro'}
-        </Button>
-
+        
         <div className="w-full">
           <CoverForm
             onFormChange={handleFormChange}
@@ -221,8 +218,37 @@ export default function HomePage() {
             onDownload={handleInitiateDownload}
           />
         </div>
+        
+        <div className="w-full max-w-sm mx-auto space-y-4">
+          <div className="flex items-center justify-between p-3 bg-card rounded-lg">
+              <p className="text-sm font-medium text-foreground flex items-center">
+                <Palette size={18} className="mr-2 text-primary"/>
+                Color Elementos Previsualización:
+              </p>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => setThemeMode('dark')} 
+                  variant={themeMode === 'dark' ? 'default' : 'outline'}
+                  size="sm"
+                  disabled={themeMode === 'dark'}
+                >
+                  Blancos
+                </Button>
+                <Button 
+                  onClick={() => setThemeMode('light')} 
+                  variant={themeMode === 'light' ? 'default' : 'outline'}
+                  size="sm"
+                  disabled={themeMode === 'light'}
+                >
+                  Negros
+                </Button>
+              </div>
+          </div>
+          <Separator />
+        </div>
 
-        <div className="w-full mt-8 flex justify-center">
+
+        <div className="w-full mt-2 flex justify-center"> {/* Reducido mt-8 a mt-2 */}
           <CoverPreview
             ref={coverPreviewRef}
             songTitle={previewState.songTitle}
