@@ -2,7 +2,7 @@
 'use client';
 
 import type { ChangeEvent } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react'; // Added useState here
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CoverFormSchema, type CoverFormValues } from '@/lib/schema';
@@ -18,8 +18,8 @@ import React from 'react';
 interface CoverFormProps {
   onFormChange: (values: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => void;
   initialValues: CoverFormValues & { coverImageUrl?: string | null };
-  onDownload: () => void; // Esto ahora abrirá el diálogo de pago
-  isProcessingPayment: boolean; // Para deshabilitar el botón mientras se procesa
+  onDownload: () => void; 
+  isProcessingPayment: boolean; 
 }
 
 export function CoverForm({ onFormChange, initialValues, onDownload, isProcessingPayment }: CoverFormProps) {
@@ -42,13 +42,17 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
 
   useEffect(() => {
     const subscription = watch((formStateFromRHF, { name, type }) => {
-      if (name !== 'coverImageFile') {
-        const { coverImageFile, ...otherRelevantState } = formStateFromRHF;
-        if (name && otherRelevantState.hasOwnProperty(name)) {
-          onFormChange({ [name]: otherRelevantState[name as keyof typeof otherRelevantState] });
-        } else {
-          onFormChange(otherRelevantState);
+      const { coverImageFile, ...otherRelevantState } = formStateFromRHF;
+      if (name && otherRelevantState.hasOwnProperty(name as keyof typeof otherRelevantState)) {
+        // For specific field changes, only send that field
+        // This helps prevent coverImageUrl from being wiped by slider/text changes
+        if (name !== 'coverImageFile') {
+            onFormChange({ [name]: otherRelevantState[name as keyof typeof otherRelevantState] });
         }
+        // coverImageFile changes are handled by handleImageUpload
+      } else if (type === 'change') { 
+        // For broader changes (like reset), send all non-file state
+        onFormChange(otherRelevantState);
       }
     });
     return () => subscription.unsubscribe();
@@ -65,6 +69,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
       };
       reader.readAsDataURL(file);
     } else {
+      // If file selection is cancelled or cleared
       onFormChange({ coverImageFile: undefined, coverImageUrl: initialValues.coverImageUrl });
       setValue('coverImageFile', undefined);
     }
@@ -87,7 +92,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
       const result = await generateAlbumCoverAction({ songTitle, artistName });
       if (result.albumCoverDataUri && result.albumCoverDataUri.startsWith('data:image')) {
         onFormChange({ coverImageUrl: result.albumCoverDataUri, coverImageFile: undefined });
-        setValue('coverImageFile', undefined); // Limpia el input de archivo
+        setValue('coverImageFile', undefined); 
         toast({
           title: '¡Portada IA Generada!',
           description: 'La IA ha creado una portada única para ti.',
@@ -116,7 +121,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
     reset({
       songTitle: initialValues.songTitle,
       artistName: initialValues.artistName,
-      coverImageFile: initialValues.coverImageFile, // Esto es FileList | undefined
+      coverImageFile: initialValues.coverImageFile, 
       durationMinutes: initialValues.durationMinutes,
       durationSeconds: initialValues.durationSeconds,
       progressPercentage: initialValues.progressPercentage,
@@ -126,7 +131,6 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
       coverImageUrl: initialValues.coverImageUrl, 
       coverImageFile: undefined 
     });
-    // Limpiar el input de archivo visualmente
     const fileInput = document.getElementById('coverImageFile-input') as HTMLInputElement;
     if (fileInput) {
         fileInput.value = '';
@@ -134,7 +138,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
   };
 
   const onSubmitTriggerPaymentDialog = () => { 
-    onDownload(); // Esto ahora dispara el diálogo de confirmación de pago en HomePage
+    onDownload();
   };
 
   return (
@@ -176,7 +180,6 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
                 id="coverImageFile-input"
                 type="file" 
                 accept="image/png, image/jpeg, image/webp"
-                // No uses form.register aquí, ya que estamos manejando el FileList manualmente
                 onChange={handleImageUpload}
                 className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
               />
@@ -236,7 +239,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
                     onValueChange={(vals) => onChange(vals[0])}
                     max={100}
                     step={1}
-                    themeMode={watch('songTitle') ? 'dark' : 'light'} // Placeholder logic, adjust as needed
+                    themeMode={watch('songTitle') ? 'dark' : 'light'}
                     className="[&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green"
                     aria-label="Porcentaje de progreso de la canción"
                     {...restField}
@@ -261,4 +264,3 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
     </>
   );
 }
-
