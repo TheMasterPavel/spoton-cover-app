@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { CoverForm } from '@/components/CoverForm';
 import { CoverPreview } from '@/components/CoverPreview';
 import type { CoverFormValues } from '@/lib/schema';
-import { Music2, ShieldCheck, Palette } from 'lucide-react';
+import { Music2, ShieldCheck, Palette, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import {
@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { createCheckoutSession } from '@/lib/stripeActions'; // Importar la acción de Stripe
+import { loadStripe, type Stripe } from '@stripe/stripe-js'; // Importar loadStripe
 
 const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   songTitle: 'Melodía Increíble',
@@ -31,6 +33,21 @@ const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   progressPercentage: 40,
 };
 
+// Promesa de Stripe para cargarla solo una vez
+let stripePromise: Promise<Stripe | null> | null = null;
+const getStripe = () => {
+  if (!stripePromise) {
+    const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    if (!publishableKey) {
+      console.error("La clave publicable de Stripe no está configurada.");
+      return Promise.resolve(null);
+    }
+    stripePromise = loadStripe(publishableKey);
+  }
+  return stripePromise;
+};
+
+
 export default function HomePage() {
   const { toast } = useToast();
   const [previewState, setPreviewState] = useState({
@@ -40,6 +57,8 @@ export default function HomePage() {
   const coverPreviewRef = useRef<HTMLDivElement>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
 
   const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => {
     setPreviewState(currentPreviewState => {
@@ -78,7 +97,7 @@ export default function HomePage() {
       
       return updatedState;
     });
-  }, [initialFormValues.durationMinutes, initialFormValues.durationSeconds, initialFormValues.progressPercentage]);
+  }, [initialFormValues.durationMinutes, initialFormValues.durationSeconds, initialFormValues.progressPercentage, initialFormValues.coverImageUrl]);
 
 
   const handlePlayPauseToggle = useCallback(() => {
@@ -116,12 +135,12 @@ export default function HomePage() {
       });
       return;
     }
-    // Define oicWidth and oicHeight *inside* the function, they are not dependencies of useCallback
+    
     const oicWidth = originalImageContainer.offsetWidth;
     const oicHeight = originalImageContainer.offsetHeight;
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000)); 
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
@@ -131,7 +150,7 @@ export default function HomePage() {
         height: elementToCapture.offsetHeight,
         scale: 2, 
         logging: true, 
-        imageTimeout: 15000, 
+        imageTimeout: 20000, 
         scrollX: 0,
         scrollY: typeof window !== 'undefined' ? -window.scrollY : 0, 
         onclone: (documentClone) => {
@@ -158,14 +177,11 @@ export default function HomePage() {
             imageContainerClone.style.height = `${oicHeight}px`;
             
             if (previewState.coverImageUrl) {
-              // Explicitly set the background image style on the clone
               imageContainerClone.style.backgroundImage = `url(${previewState.coverImageUrl})`;
               imageContainerClone.style.backgroundSize = 'cover';
               imageContainerClone.style.backgroundPosition = 'center center';
               imageContainerClone.style.backgroundRepeat = 'no-repeat';
-              // DO NOT set backgroundColor here if there is an image
             } else {
-              // Handle placeholder: make background transparent and clear any potential lingering backgroundImage
               imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
               imageContainerClone.style.backgroundImage = ''; 
             }
@@ -199,25 +215,128 @@ export default function HomePage() {
         duration: 5000,
       });
     }
-  // The dependency array for useCallback should only include variables from the outer scope
-  // that captureAndDownloadCover actually depends on.
-  // oicWidth and oicHeight are calculated inside, so they are NOT dependencies.
   }, [toast, previewState.coverImageUrl]); 
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
   };
 
-  const handleConfirmPaymentAndDownload = () => {
-    setIsPaymentDialogOpen(false);
-    toast({
-      title: "Pago Confirmado (Simulado)",
-      description: "Gracias por tu compra. Iniciando descarga...",
-      className: "bg-green-600 text-white", 
-      duration: 3000,
-    });
-    captureAndDownloadCover();
+  const handleStripeCheckout = async () => {
+    setIsProcessingPayment(true);
+    setIsPaymentDialogOpen(false); // Cierra el diálogo de confirmación
+    
+    // Guardar estado actual en localStorage para recuperarlo después del redirect
+    try {
+      localStorage.setItem('spotOnCoverPreviewState', JSON.stringify(previewState));
+    } catch (e) {
+      console.error("Error al guardar estado en localStorage:", e);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar el estado de tu portada. Por favor, intenta de nuevo.",
+        variant: "destructive",
+        duration: 3000
+      });
+      setIsProcessingPayment(false);
+      return;
+    }
+
+    const { sessionId, error: sessionError } = await createCheckoutSession();
+
+    if (sessionError || !sessionId) {
+      toast({
+        title: 'Error al Iniciar Pago',
+        description: sessionError || 'No se pudo crear la sesión de pago. Inténtalo de nuevo.',
+        variant: 'destructive',
+        duration: 5000,
+      });
+      localStorage.removeItem('spotOnCoverPreviewState'); // Limpiar si falla
+      setIsProcessingPayment(false);
+      return;
+    }
+
+    const stripe = await getStripe();
+    if (!stripe) {
+        toast({
+            title: 'Error de Stripe',
+            description: 'No se pudo cargar la librería de Stripe. Revisa la configuración.',
+            variant: 'destructive',
+            duration: 5000,
+        });
+        localStorage.removeItem('spotOnCoverPreviewState');
+        setIsProcessingPayment(false);
+        return;
+    }
+
+    const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
+
+    if (stripeError) {
+      console.error('Error al redirigir a Stripe Checkout:', stripeError);
+      toast({
+        title: 'Error al Redirigir a Pago',
+        description: stripeError.message || 'No se pudo redirigir a la página de pago. Inténtalo de nuevo.',
+        variant: 'destructive',
+        duration: 5000,
+      });
+      localStorage.removeItem('spotOnCoverPreviewState');
+      setIsProcessingPayment(false);
+    }
+    // No se resetea isProcessingPayment aquí porque la página redirigirá.
   };
+
+  // Efecto para manejar el retorno de Stripe
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentSuccess = urlParams.get('payment_success');
+    const paymentCanceled = urlParams.get('payment_canceled');
+    // const sessionId = urlParams.get('session_id'); // Podrías usarlo para verificar el pago en backend
+
+    const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
+    if (savedStateString) {
+      try {
+        const savedState = JSON.parse(savedStateString);
+        // Solo actualiza si el estado guardado es diferente para evitar bucles
+        if (JSON.stringify(savedState) !== JSON.stringify(previewState)) {
+            setPreviewState(savedState);
+        }
+      } catch (e) {
+        console.error("Error al parsear estado de localStorage:", e);
+      }
+    }
+    
+    if (paymentSuccess) {
+      toast({
+        title: '¡Pago Exitoso!',
+        description: 'Gracias por tu compra. Iniciando descarga de tu portada...',
+        className: 'bg-green-600 text-white',
+        duration: 4000,
+      });
+      // Esperar a que el estado se actualice con los datos de localStorage si es necesario
+      // antes de llamar a captureAndDownloadCover
+      setTimeout(() => {
+        if (savedStateString) { // Asegurarse que se restauró el estado
+            captureAndDownloadCover();
+        } else {
+            // Si no hay estado guardado, quizá el usuario llegó aquí directamente.
+            // Podrías mostrar un mensaje o simplemente no hacer nada.
+            console.warn("Pago exitoso pero no se encontró estado guardado para la descarga.")
+        }
+        localStorage.removeItem('spotOnCoverPreviewState');
+        // Limpiar parámetros de la URL
+        window.history.replaceState(null, '', window.location.pathname);
+      }, 500); // Pequeña demora para asegurar la restauración del estado
+    }
+
+    if (paymentCanceled) {
+      toast({
+        title: 'Pago Cancelado',
+        description: 'El proceso de pago fue cancelado. Puedes intentarlo de nuevo.',
+        variant: 'destructive',
+        duration: 4000,
+      });
+      localStorage.removeItem('spotOnCoverPreviewState');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [toast, captureAndDownloadCover]); // Añadido previewState a dependencias
 
   const totalDurationSeconds = (previewState.durationMinutes * 60) + previewState.durationSeconds;
 
@@ -238,6 +357,7 @@ export default function HomePage() {
             onFormChange={handleFormChange}
             initialValues={initialFormValues}
             onDownload={handleInitiateDownload}
+            isProcessingPayment={isProcessingPayment}
           />
         </div>
         
@@ -303,13 +423,18 @@ export default function HomePage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Estás a punto de adquirir tu portada personalizada por un precio único de <strong>0,99€</strong>.
-              Este es un pago simulado para demostración.
+              Serás redirigido a Stripe para completar el pago de forma segura.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmPaymentAndDownload} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              Pagar 0,99€ y Descargar
+            <AlertDialogCancel disabled={isProcessingPayment}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleStripeCheckout} 
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              disabled={isProcessingPayment}
+            >
+              {isProcessingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Pagar 0,99€ y Continuar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -317,3 +442,4 @@ export default function HomePage() {
     </main>
   );
 }
+
