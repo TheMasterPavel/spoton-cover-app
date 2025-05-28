@@ -20,8 +20,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { createCheckoutSession } from '@/lib/stripeActions'; // Importar la acción de Stripe
-import { loadStripe, type Stripe } from '@stripe/stripe-js'; // Importar loadStripe
+import { createCheckoutSession } from '@/lib/stripeActions';
+import { loadStripe, type Stripe } from '@stripe/stripe-js';
 
 const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   songTitle: 'Melodía Increíble',
@@ -33,7 +33,6 @@ const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   progressPercentage: 40,
 };
 
-// Promesa de Stripe para cargarla solo una vez
 let stripePromise: Promise<Stripe | null> | null = null;
 const getStripe = () => {
   if (!stripePromise) {
@@ -152,7 +151,7 @@ export default function HomePage() {
         logging: true, 
         imageTimeout: 20000, 
         scrollX: 0,
-        scrollY: typeof window !== 'undefined' ? -window.scrollY : 0, 
+        scrollY: typeof window !== 'undefined' ? -window.scrollY : 0,
         onclone: (documentClone) => {
           documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
           documentClone.body.style.setProperty('background-color', 'transparent', 'important');
@@ -223,9 +222,8 @@ export default function HomePage() {
 
   const handleStripeCheckout = async () => {
     setIsProcessingPayment(true);
-    setIsPaymentDialogOpen(false); // Cierra el diálogo de confirmación
+    // No cerramos el diálogo aquí, se cierra si Stripe redirige o por el usuario
     
-    // Guardar estado actual en localStorage para recuperarlo después del redirect
     try {
       localStorage.setItem('spotOnCoverPreviewState', JSON.stringify(previewState));
     } catch (e) {
@@ -237,6 +235,7 @@ export default function HomePage() {
         duration: 3000
       });
       setIsProcessingPayment(false);
+      setIsPaymentDialogOpen(false); // Cerrar dialogo en caso de error
       return;
     }
 
@@ -249,8 +248,9 @@ export default function HomePage() {
         variant: 'destructive',
         duration: 5000,
       });
-      localStorage.removeItem('spotOnCoverPreviewState'); // Limpiar si falla
+      localStorage.removeItem('spotOnCoverPreviewState'); 
       setIsProcessingPayment(false);
+      setIsPaymentDialogOpen(false); // Cerrar dialogo en caso de error
       return;
     }
 
@@ -264,6 +264,7 @@ export default function HomePage() {
         });
         localStorage.removeItem('spotOnCoverPreviewState');
         setIsProcessingPayment(false);
+        setIsPaymentDialogOpen(false); // Cerrar dialogo en caso de error
         return;
     }
 
@@ -279,22 +280,21 @@ export default function HomePage() {
       });
       localStorage.removeItem('spotOnCoverPreviewState');
       setIsProcessingPayment(false);
+      setIsPaymentDialogOpen(false); // Cerrar dialogo en caso de error
     }
-    // No se resetea isProcessingPayment aquí porque la página redirigirá.
+    // Si todo va bien, la página redirigirá, no es necesario resetear isProcessingPayment aquí.
+    // El diálogo se cerrará automáticamente si la redirección ocurre.
   };
 
-  // Efecto para manejar el retorno de Stripe
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const paymentSuccess = urlParams.get('payment_success');
     const paymentCanceled = urlParams.get('payment_canceled');
-    // const sessionId = urlParams.get('session_id'); // Podrías usarlo para verificar el pago en backend
 
     const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
     if (savedStateString) {
       try {
         const savedState = JSON.parse(savedStateString);
-        // Solo actualiza si el estado guardado es diferente para evitar bucles
         if (JSON.stringify(savedState) !== JSON.stringify(previewState)) {
             setPreviewState(savedState);
         }
@@ -310,20 +310,15 @@ export default function HomePage() {
         className: 'bg-green-600 text-white',
         duration: 4000,
       });
-      // Esperar a que el estado se actualice con los datos de localStorage si es necesario
-      // antes de llamar a captureAndDownloadCover
       setTimeout(() => {
-        if (savedStateString) { // Asegurarse que se restauró el estado
+        if (savedStateString) { 
             captureAndDownloadCover();
         } else {
-            // Si no hay estado guardado, quizá el usuario llegó aquí directamente.
-            // Podrías mostrar un mensaje o simplemente no hacer nada.
             console.warn("Pago exitoso pero no se encontró estado guardado para la descarga.")
         }
         localStorage.removeItem('spotOnCoverPreviewState');
-        // Limpiar parámetros de la URL
         window.history.replaceState(null, '', window.location.pathname);
-      }, 500); // Pequeña demora para asegurar la restauración del estado
+      }, 500); 
     }
 
     if (paymentCanceled) {
@@ -336,7 +331,12 @@ export default function HomePage() {
       localStorage.removeItem('spotOnCoverPreviewState');
       window.history.replaceState(null, '', window.location.pathname);
     }
-  }, [toast, captureAndDownloadCover]); // Añadido previewState a dependencias
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast, captureAndDownloadCover]); 
+  // Nota: previewState se omitió intencionadamente de las dependencias para evitar
+  // re-ejecutar este efecto cada vez que previewState cambie, ya que solo nos
+  // interesa al cargar la página y al restaurar el estado desde localStorage.
+  // captureAndDownloadCover tiene sus propias dependencias.
 
   const totalDurationSeconds = (previewState.durationMinutes * 60) + previewState.durationSeconds;
 
@@ -427,9 +427,9 @@ export default function HomePage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isProcessingPayment}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isProcessingPayment} onClick={() => setIsPaymentDialogOpen(false)}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleStripeCheckout} 
+              onClick={handleStripeCheckout} // <--- AQUÍ ESTÁ EL CAMBIO IMPORTANTE
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
               disabled={isProcessingPayment}
             >
@@ -443,3 +443,4 @@ export default function HomePage() {
   );
 }
 
+    
