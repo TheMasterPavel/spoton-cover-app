@@ -1,7 +1,4 @@
-import type {NextConfig} from 'next';
-
-const nextConfig: NextConfig = {
-  /* config options here */
+const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -16,6 +13,11 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+    ],
+  },
+  experimental: {
+    allowedDevOrigins: [
+      "https://3000-firebase-studio-1747900301578.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
     ],
   },
 };
