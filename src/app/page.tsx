@@ -1,11 +1,9 @@
-
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { CoverForm } from '@/components/CoverForm';
 import { CoverPreview } from '@/components/CoverPreview';
 import type { CoverFormValues } from '@/lib/schema';
-import { Music2, ShieldCheck, Palette, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import {
@@ -20,8 +18,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { createCheckoutSession } from '@/lib/stripeActions';
+import { createCheckoutSession } from '@/lib/stripeActions'; // Assuming this is the correct path
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import { useRouter, useSearchParams } from 'next/navigation'; // Import useRouter and useSearchParams
+
 
 const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   songTitle: 'Melodía Increíble',
@@ -46,9 +46,11 @@ const getStripe = () => {
   return stripePromise;
 };
 
-
 export default function HomePage() {
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [previewState, setPreviewState] = useState({
     ...initialFormValues,
     isPlaying: false,
@@ -57,7 +59,6 @@ export default function HomePage() {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-
 
   const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => {
     setPreviewState(currentPreviewState => {
@@ -96,8 +97,7 @@ export default function HomePage() {
       
       return updatedState;
     });
-  }, [initialFormValues.durationMinutes, initialFormValues.durationSeconds, initialFormValues.progressPercentage, initialFormValues.coverImageUrl]);
-
+  }, []);
 
   const handlePlayPauseToggle = useCallback(() => {
     setPreviewState(prevState => ({ ...prevState, isPlaying: !prevState.isPlaying }));
@@ -111,7 +111,7 @@ export default function HomePage() {
       }));
     }
   }, [previewState.coverImageUrl, previewState.coverImageFile, initialFormValues.coverImageUrl]);
-
+  
   const captureAndDownloadCover = useCallback(async () => {
     const elementToCapture = coverPreviewRef.current;
     if (!elementToCapture) {
@@ -123,33 +123,34 @@ export default function HomePage() {
       });
       return;
     }
-
+    
     const originalImageContainer = elementToCapture.querySelector<HTMLDivElement>('#cover-image-container');
     if (!originalImageContainer) {
-      toast({
-        title: 'Error de Descarga',
-        description: 'No se pudo encontrar el sub-elemento contenedor de la imagen original.',
-        variant: 'destructive',
-        duration: 4000,
-      });
-      return;
+        toast({
+            title: 'Error de Descarga',
+            description: 'No se pudo encontrar el sub-elemento contenedor de la imagen original.',
+            variant: 'destructive',
+            duration: 4000,
+        });
+        return;
     }
-    
+
+    // Capture dimensions from the live DOM element
     const oicWidth = originalImageContainer.offsetWidth;
     const oicHeight = originalImageContainer.offsetHeight;
 
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500)); 
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null, 
+        backgroundColor: null,
+        logging: false, 
         width: elementToCapture.offsetWidth,
         height: elementToCapture.offsetHeight,
-        scale: 2, 
-        logging: true, 
-        imageTimeout: 20000, 
+        scale: 2, // window.devicePixelRatio || 1, 
         scrollX: 0,
         scrollY: typeof window !== 'undefined' ? -window.scrollY : 0,
         onclone: (documentClone) => {
@@ -162,39 +163,39 @@ export default function HomePage() {
 
           if (clonedCard) {
             clonedCard.style.setProperty('background-color', 'transparent', 'important');
-            clonedCard.style.setProperty('background', 'transparent', 'important');
             clonedCard.style.boxShadow = 'none';
             clonedCard.style.border = 'none';
           }
           if (clonedCardContent) {
             clonedCardContent.style.setProperty('background-color', 'transparent', 'important');
-            clonedCardContent.style.setProperty('background', 'transparent', 'important');
           }
 
           if (imageContainerClone) {
+            // Apply captured dimensions to the cloned container
             imageContainerClone.style.width = `${oicWidth}px`;
             imageContainerClone.style.height = `${oicHeight}px`;
-            
+
             if (previewState.coverImageUrl) {
-              imageContainerClone.style.backgroundImage = `url(${previewState.coverImageUrl})`;
-              imageContainerClone.style.backgroundSize = 'cover';
-              imageContainerClone.style.backgroundPosition = 'center center';
-              imageContainerClone.style.backgroundRepeat = 'no-repeat';
+                // Re-apply background image styles explicitly to the clone
+                imageContainerClone.style.backgroundImage = `url(${previewState.coverImageUrl})`;
+                imageContainerClone.style.backgroundSize = 'cover';
+                imageContainerClone.style.backgroundPosition = 'center';
+                imageContainerClone.style.backgroundRepeat = 'no-repeat';
+                // No explicit background-color if image is present
             } else {
-              imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
-              imageContainerClone.style.backgroundImage = ''; 
+                // If no image, ensure placeholder container is transparent
+                imageContainerClone.style.backgroundImage = ''; // Clear any potential inherited BG image
+                imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
             }
-            
             imageContainerClone.style.borderRadius = '0.375rem'; 
-            imageContainerClone.style.overflow = 'hidden'; 
+            imageContainerClone.style.overflow = 'hidden';
           }
         },
       });
-      const imageMimeType = 'image/png'; 
-      const imageUrlToDownload = canvas.toDataURL(imageMimeType);
 
+      const imageUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.href = imageUrlToDownload;
+      link.href = imageUrl;
       link.download = 'spotify_cover.png';
       document.body.appendChild(link);
       link.click();
@@ -206,15 +207,15 @@ export default function HomePage() {
         duration: 3000,
       });
     } catch (error) {
-      console.error('Error al generar la imagen para descarga con html2canvas:', error);
+      console.error('Error al generar la imagen:', error);
       toast({
         title: 'Error de Descarga',
-        description: 'No se pudo generar la imagen de la portada. Revisa la consola para más detalles e inténtalo de nuevo.',
+        description: 'No se pudo generar la imagen de la portada. Revisa la consola e inténtalo de nuevo.',
         variant: 'destructive',
         duration: 5000,
       });
     }
-  }, [toast, previewState.coverImageUrl]); 
+  }, [toast, previewState.coverImageUrl]);
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
@@ -222,20 +223,19 @@ export default function HomePage() {
 
   const handleStripeCheckout = async () => {
     setIsProcessingPayment(true);
-    // No cerramos el diálogo aquí, se cierra si Stripe redirige o por el usuario
-    
+
     try {
       localStorage.setItem('spotOnCoverPreviewState', JSON.stringify(previewState));
     } catch (e) {
       console.error("Error al guardar estado en localStorage:", e);
       toast({
         title: "Error",
-        description: "No se pudo guardar el estado de tu portada. Por favor, intenta de nuevo.",
+        description: "No se pudo guardar el estado de tu portada.",
         variant: "destructive",
-        duration: 3000
+        duration: 3000,
       });
       setIsProcessingPayment(false);
-      setIsPaymentDialogOpen(false); // Cerrar dialogo en caso de error
+      setIsPaymentDialogOpen(false);
       return;
     }
 
@@ -244,203 +244,151 @@ export default function HomePage() {
     if (sessionError || !sessionId) {
       toast({
         title: 'Error al Iniciar Pago',
-        description: sessionError || 'No se pudo crear la sesión de pago. Inténtalo de nuevo.',
+        description: sessionError || 'No se pudo crear la sesión de pago.',
         variant: 'destructive',
         duration: 5000,
       });
-      localStorage.removeItem('spotOnCoverPreviewState'); 
+      localStorage.removeItem('spotOnCoverPreviewState');
       setIsProcessingPayment(false);
-      setIsPaymentDialogOpen(false); // Cerrar dialogo en caso de error
+      setIsPaymentDialogOpen(false);
       return;
     }
 
     const stripe = await getStripe();
     if (!stripe) {
-        toast({
-            title: 'Error de Stripe',
-            description: 'No se pudo cargar la librería de Stripe. Revisa la configuración.',
-            variant: 'destructive',
-            duration: 5000,
-        });
-        localStorage.removeItem('spotOnCoverPreviewState');
-        setIsProcessingPayment(false);
-        setIsPaymentDialogOpen(false); // Cerrar dialogo en caso de error
-        return;
-    }
-
-    const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
-
-    if (stripeError) {
-      console.error('Error al redirigir a Stripe Checkout:', stripeError);
       toast({
-        title: 'Error al Redirigir a Pago',
-        description: stripeError.message || 'No se pudo redirigir a la página de pago. Inténtalo de nuevo.',
+        title: 'Error de Stripe',
+        description: 'No se pudo cargar la librería de Stripe.',
         variant: 'destructive',
         duration: 5000,
       });
       localStorage.removeItem('spotOnCoverPreviewState');
       setIsProcessingPayment(false);
-      setIsPaymentDialogOpen(false); // Cerrar dialogo en caso de error
+      setIsPaymentDialogOpen(false);
+      return;
     }
-    // Si todo va bien, la página redirigirá, no es necesario resetear isProcessingPayment aquí.
-    // El diálogo se cerrará automáticamente si la redirección ocurre.
+
+    const { error } = await stripe.redirectToCheckout({ sessionId });
+    if (error) {
+      toast({
+        title: 'Error al Redirigir',
+        description: error.message || 'No se pudo redirigir a Stripe.',
+        variant: 'destructive',
+        duration: 5000,
+      });
+      localStorage.removeItem('spotOnCoverPreviewState');
+    }
+    // setIsProcessingPayment and setIsPaymentDialogOpen are handled by page navigation or error
   };
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const paymentSuccess = urlParams.get('payment_success');
-    const paymentCanceled = urlParams.get('payment_canceled');
+    const paymentSuccess = searchParams.get('payment_success');
+    const paymentCanceled = searchParams.get('payment_canceled');
+    const currentPath = window.location.pathname;
 
-    const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
-    if (savedStateString) {
-      try {
-        const savedState = JSON.parse(savedStateString);
-        if (JSON.stringify(savedState) !== JSON.stringify(previewState)) {
-            setPreviewState(savedState);
-        }
-      } catch (e) {
-        console.error("Error al parsear estado de localStorage:", e);
-      }
-    }
-    
-    if (paymentSuccess) {
+    if (paymentSuccess === 'true') {
       toast({
         title: '¡Pago Exitoso!',
-        description: 'Gracias por tu compra. Iniciando descarga de tu portada...',
-        className: 'bg-green-600 text-white',
-        duration: 4000,
+        description: 'Tu descarga comenzará en breve.',
+        duration: 5000,
       });
-      setTimeout(() => {
-        if (savedStateString) { 
-            captureAndDownloadCover();
-        } else {
-            console.warn("Pago exitoso pero no se encontró estado guardado para la descarga.")
+      const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
+      if (savedStateString) {
+        try {
+          const savedState = JSON.parse(savedStateString);
+          setPreviewState(savedState); // Restore state
+          // Wait for state to apply and preview to re-render before downloading
+          setTimeout(() => {
+             captureAndDownloadCover();
+          }, 500);
+        } catch (e) {
+          console.error("Error al restaurar estado desde localStorage:", e);
         }
-        localStorage.removeItem('spotOnCoverPreviewState');
-        window.history.replaceState(null, '', window.location.pathname);
-      }, 500); 
-    }
-
-    if (paymentCanceled) {
+      } else {
+        // Fallback if no saved state, maybe just download with current (potentially default) state
+        // or show another message. For now, we assume state restoration is key.
+         captureAndDownloadCover();
+      }
+      localStorage.removeItem('spotOnCoverPreviewState');
+      router.replace(currentPath, { scroll: false }); // Remove query params
+    } else if (paymentCanceled === 'true') {
       toast({
         title: 'Pago Cancelado',
-        description: 'El proceso de pago fue cancelado. Puedes intentarlo de nuevo.',
+        description: 'Has cancelado el proceso de pago.',
         variant: 'destructive',
-        duration: 4000,
+        duration: 5000,
       });
+      const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
+       if (savedStateString) {
+        try {
+          const savedState = JSON.parse(savedStateString);
+          setPreviewState(savedState); // Restore state
+        } catch (e) {
+          console.error("Error al restaurar estado desde localStorage:", e);
+        }
+      }
       localStorage.removeItem('spotOnCoverPreviewState');
-      window.history.replaceState(null, '', window.location.pathname);
+      router.replace(currentPath, { scroll: false }); // Remove query params
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, captureAndDownloadCover]); 
-  // Nota: previewState se omitió intencionadamente de las dependencias para evitar
-  // re-ejecutar este efecto cada vez que previewState cambie, ya que solo nos
-  // interesa al cargar la página y al restaurar el estado desde localStorage.
-  // captureAndDownloadCover tiene sus propias dependencias.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, router, toast]); // captureAndDownloadCover is not stable, but it's complex to make it so here
 
-  const totalDurationSeconds = (previewState.durationMinutes * 60) + previewState.durationSeconds;
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
-      <header className="mb-8 text-center">
-        <div className="flex items-center justify-center space-x-2 mb-2">
-          <Music2 size={36} className="text-primary" />
-          <h1 className="text-4xl font-bold">SpotOn Cover</h1>
+    <>
+      <main className="flex flex-col items-center justify-center py-10 px-4 space-y-8">
+        <CoverForm
+          initialValues={previewState}
+          onFormChange={handleFormChange}
+          onDownload={handleInitiateDownload}
+          isProcessingPayment={isProcessingPayment}
+        />
+        <Separator />
+        <div className="flex gap-2 mb-4">
+            <Button 
+                onClick={() => setThemeMode('light')} 
+                disabled={themeMode === 'light' || isProcessingPayment}
+                variant={themeMode === 'light' ? "default" : "outline"}
+            >
+                Elementos Negros
+            </Button>
+            <Button 
+                onClick={() => setThemeMode('dark')} 
+                disabled={themeMode === 'dark' || isProcessingPayment}
+                variant={themeMode === 'dark' ? "default" : "outline"}
+            >
+                Elementos Blancos
+            </Button>
         </div>
-        <p className="text-muted-foreground">Crea tu portada de canción perfecta, al estilo Spotify.</p>
-      </header>
-
-      <div className="flex flex-col items-center gap-8 lg:gap-12 w-full max-w-3xl px-4">
-        
-        <div className="w-full">
-          <CoverForm
-            onFormChange={handleFormChange}
-            initialValues={initialFormValues}
-            onDownload={handleInitiateDownload}
-            isProcessingPayment={isProcessingPayment}
-          />
-        </div>
-        
-        <div className="w-full max-w-sm mx-auto space-y-4">
-          <div className="flex items-center justify-between p-3 bg-card rounded-lg shadow-md">
-              <p className="text-sm font-medium text-foreground flex items-center">
-                <Palette size={18} className="mr-2 text-primary"/>
-                Previsualización (Elementos):
-              </p>
-              <div className="flex gap-2">
-                <Button 
-                  onClick={() => setThemeMode('dark')} 
-                  variant={themeMode === 'dark' ? 'default' : 'outline'}
-                  size="sm"
-                  disabled={themeMode === 'dark'}
-                  aria-label="Cambiar a elementos blancos (fondo oscuro previsualización)"
-                  className={themeMode === 'dark' ? 'border-primary text-primary cursor-not-allowed' : 'border-input hover:bg-accent hover:text-accent-foreground'}
-                >
-                  Blancos
-                </Button>
-                <Button 
-                  onClick={() => setThemeMode('light')} 
-                  variant={themeMode === 'light' ? 'default' : 'outline'}
-                  size="sm"
-                  disabled={themeMode === 'light'}
-                  aria-label="Cambiar a elementos negros (fondo claro previsualización)"
-                  className={themeMode === 'light' ? 'border-primary text-primary cursor-not-allowed' : 'border-input hover:bg-accent hover:text-accent-foreground'}
-                >
-                  Negros
-                </Button>
-              </div>
-          </div>
-          <Separator />
-        </div>
-
-
-        <div className="w-full mt-2 flex justify-center">
-          <CoverPreview
-            ref={coverPreviewRef}
-            songTitle={previewState.songTitle}
-            artistName={previewState.artistName}
-            imageUrl={previewState.coverImageUrl}
-            durationSeconds={totalDurationSeconds}
-            progressPercentage={previewState.progressPercentage}
-            isPlaying={previewState.isPlaying}
-            onPlayPauseToggle={handlePlayPauseToggle}
-            themeMode={themeMode}
-          />
-        </div>
-      </div>
-
-      <footer className="mt-12 text-center text-sm text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} SpotOn Cover. Todos los derechos reservados (aplicación conceptual).</p>
-        <p>Inspirado en la interfaz de usuario de Spotify. No afiliado a Spotify.</p>
-      </footer>
+        <CoverPreview
+          ref={coverPreviewRef}
+          songTitle={previewState.songTitle}
+          artistName={previewState.artistName}
+          imageUrl={previewState.coverImageUrl}
+          durationSeconds={previewState.durationMinutes * 60 + previewState.durationSeconds}
+          progressPercentage={previewState.progressPercentage}
+          isPlaying={previewState.isPlaying}
+          onPlayPauseToggle={handlePlayPauseToggle}
+          themeMode={themeMode}
+        />
+      </main>
 
       <AlertDialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center">
-              <ShieldCheck className="mr-2 h-5 w-5 text-primary" />
-              Confirmar Compra
-            </AlertDialogTitle>
+            <AlertDialogTitle>¿Confirmar pago y descargar?</AlertDialogTitle>
             <AlertDialogDescription>
-              Estás a punto de adquirir tu portada personalizada por un precio único de <strong>0,99€</strong>.
-              Serás redirigido a Stripe para completar el pago de forma segura.
+              Para continuar con la descarga de tu portada personalizada (0,99€), serás redirigido a Stripe para completar el pago de forma segura.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isProcessingPayment} onClick={() => setIsPaymentDialogOpen(false)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleStripeCheckout} // <--- AQUÍ ESTÁ EL CAMBIO IMPORTANTE
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              disabled={isProcessingPayment}
-            >
-              {isProcessingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Pagar 0,99€ y Continuar
+            <AlertDialogAction onClick={handleStripeCheckout} disabled={isProcessingPayment}>
+              {isProcessingPayment ? 'Procesando...' : 'Pagar 0,99€ y Continuar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </>
   );
 }
-
-    

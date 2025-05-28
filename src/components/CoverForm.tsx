@@ -2,7 +2,7 @@
 'use client';
 
 import type { ChangeEvent } from 'react';
-import { useEffect, useState } from 'react'; // Added useState here
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CoverFormSchema, type CoverFormValues } from '@/lib/schema';
@@ -44,14 +44,10 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
     const subscription = watch((formStateFromRHF, { name, type }) => {
       const { coverImageFile, ...otherRelevantState } = formStateFromRHF;
       if (name && otherRelevantState.hasOwnProperty(name as keyof typeof otherRelevantState)) {
-        // For specific field changes, only send that field
-        // This helps prevent coverImageUrl from being wiped by slider/text changes
         if (name !== 'coverImageFile') {
             onFormChange({ [name]: otherRelevantState[name as keyof typeof otherRelevantState] });
         }
-        // coverImageFile changes are handled by handleImageUpload
       } else if (type === 'change') { 
-        // For broader changes (like reset), send all non-file state
         onFormChange(otherRelevantState);
       }
     });
@@ -69,7 +65,6 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
       };
       reader.readAsDataURL(file);
     } else {
-      // If file selection is cancelled or cleared
       onFormChange({ coverImageFile: undefined, coverImageUrl: initialValues.coverImageUrl });
       setValue('coverImageFile', undefined);
     }
@@ -109,7 +104,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
         variant: 'destructive',
         duration: 5000,
       });
-      if (!getValues('coverImageFile')) {
+      if (!getValues('coverImageFile') && initialValues.coverImageUrl) { // Check initialValues.coverImageUrl
          onFormChange({ coverImageUrl: initialValues.coverImageUrl });
       }
     } finally {
@@ -121,7 +116,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
     reset({
       songTitle: initialValues.songTitle,
       artistName: initialValues.artistName,
-      coverImageFile: initialValues.coverImageFile, 
+      coverImageFile: undefined, // Always reset file input visually
       durationMinutes: initialValues.durationMinutes,
       durationSeconds: initialValues.durationSeconds,
       progressPercentage: initialValues.progressPercentage,
@@ -144,7 +139,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmitTriggerPaymentDialog)} className="space-y-6 p-4 md:p-6 rounded-lg shadow-lg bg-card w-full">
+        <form onSubmit={form.handleSubmit(onSubmitTriggerPaymentDialog)} className="space-y-6 p-4 md:p-6 rounded-lg shadow-lg bg-card w-full max-w-md">
           <FormField
             control={form.control}
             name="songTitle"
@@ -230,16 +225,16 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
           <FormField
             control={form.control}
             name="progressPercentage"
-            render={({ field: { onChange, value, ...restField } }) => ( 
+            render={({ field: { onChange: onSliderChange, value, ...restField } }) => ( 
               <FormItem>
                 <FormLabel>Progreso: {value !== undefined && value !== null ? value : 0}%</FormLabel>
                 <FormControl>
                    <Slider
                     value={[value !== undefined && value !== null ? value : 0]}
-                    onValueChange={(vals) => onChange(vals[0])}
+                    onValueChange={(vals) => onSliderChange(vals[0])}
                     max={100}
                     step={1}
-                    themeMode={watch('songTitle') ? 'dark' : 'light'}
+                    themeMode={watch('songTitle') ? 'dark' : 'light'} // This themeMode might be different from page's themeMode
                     className="[&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green"
                     aria-label="Porcentaje de progreso de la canción"
                     {...restField}
