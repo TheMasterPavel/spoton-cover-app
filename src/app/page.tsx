@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -18,9 +19,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { createCheckoutSession } from '@/lib/stripeActions'; // Assuming this is the correct path
+import { createCheckoutSession } from '@/lib/stripeActions'; // Ensure this path is correct
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
-import { useRouter, useSearchParams } from 'next/navigation'; // Import useRouter and useSearchParams
+import { useRouter, useSearchParams } from 'next/navigation';
 
 
 const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
@@ -135,7 +136,6 @@ export default function HomePage() {
         return;
     }
 
-    // Capture dimensions from the live DOM element
     const oicWidth = originalImageContainer.offsetWidth;
     const oicHeight = originalImageContainer.offsetHeight;
 
@@ -147,10 +147,10 @@ export default function HomePage() {
         allowTaint: true,
         useCORS: true,
         backgroundColor: null,
-        logging: false, 
+        logging: true, 
         width: elementToCapture.offsetWidth,
         height: elementToCapture.offsetHeight,
-        scale: 2, // window.devicePixelRatio || 1, 
+        scale: 2, 
         scrollX: 0,
         scrollY: typeof window !== 'undefined' ? -window.scrollY : 0,
         onclone: (documentClone) => {
@@ -171,20 +171,16 @@ export default function HomePage() {
           }
 
           if (imageContainerClone) {
-            // Apply captured dimensions to the cloned container
             imageContainerClone.style.width = `${oicWidth}px`;
             imageContainerClone.style.height = `${oicHeight}px`;
 
             if (previewState.coverImageUrl) {
-                // Re-apply background image styles explicitly to the clone
                 imageContainerClone.style.backgroundImage = `url(${previewState.coverImageUrl})`;
                 imageContainerClone.style.backgroundSize = 'cover';
                 imageContainerClone.style.backgroundPosition = 'center';
                 imageContainerClone.style.backgroundRepeat = 'no-repeat';
-                // No explicit background-color if image is present
             } else {
-                // If no image, ensure placeholder container is transparent
-                imageContainerClone.style.backgroundImage = ''; // Clear any potential inherited BG image
+                imageContainerClone.style.backgroundImage = ''; 
                 imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
             }
             imageContainerClone.style.borderRadius = '0.375rem'; 
@@ -215,7 +211,7 @@ export default function HomePage() {
         duration: 5000,
       });
     }
-  }, [toast, previewState.coverImageUrl]);
+  }, [toast, previewState.coverImageUrl]); // oicWidth and oicHeight removed from dependencies
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
@@ -284,7 +280,7 @@ export default function HomePage() {
   useEffect(() => {
     const paymentSuccess = searchParams.get('payment_success');
     const paymentCanceled = searchParams.get('payment_canceled');
-    const currentPath = window.location.pathname;
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
 
     if (paymentSuccess === 'true') {
       toast({
@@ -296,21 +292,21 @@ export default function HomePage() {
       if (savedStateString) {
         try {
           const savedState = JSON.parse(savedStateString);
-          setPreviewState(savedState); // Restore state
-          // Wait for state to apply and preview to re-render before downloading
+          setPreviewState(savedState); 
           setTimeout(() => {
              captureAndDownloadCover();
-          }, 500);
+          }, 500); // Small delay to ensure state is applied before capture
         } catch (e) {
           console.error("Error al restaurar estado desde localStorage:", e);
+           // Fallback: attempt download even if state restoration fails, though it might use default state
+          captureAndDownloadCover();
         }
       } else {
-        // Fallback if no saved state, maybe just download with current (potentially default) state
-        // or show another message. For now, we assume state restoration is key.
+         // If no saved state, attempt download (might use default state or current state if any)
          captureAndDownloadCover();
       }
       localStorage.removeItem('spotOnCoverPreviewState');
-      router.replace(currentPath, { scroll: false }); // Remove query params
+      if (currentPath) router.replace(currentPath, { scroll: false }); 
     } else if (paymentCanceled === 'true') {
       toast({
         title: 'Pago Cancelado',
@@ -322,54 +318,58 @@ export default function HomePage() {
        if (savedStateString) {
         try {
           const savedState = JSON.parse(savedStateString);
-          setPreviewState(savedState); // Restore state
+          setPreviewState(savedState); 
         } catch (e) {
           console.error("Error al restaurar estado desde localStorage:", e);
+          // No need to trigger download on cancel
         }
       }
       localStorage.removeItem('spotOnCoverPreviewState');
-      router.replace(currentPath, { scroll: false }); // Remove query params
+      if (currentPath) router.replace(currentPath, { scroll: false }); 
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, router, toast]); // captureAndDownloadCover is not stable, but it's complex to make it so here
+  }, [searchParams, router, toast, captureAndDownloadCover]);
 
 
   return (
     <>
-      <main className="flex flex-col items-center justify-center py-10 px-4 space-y-8">
+      <main className="flex flex-col items-center justify-start py-10 px-4 space-y-8 min-h-screen">
+        <div className="w-full max-w-sm"> {/* Container for Preview and Theme Buttons */}
+            <CoverPreview
+              ref={coverPreviewRef}
+              songTitle={previewState.songTitle}
+              artistName={previewState.artistName}
+              imageUrl={previewState.coverImageUrl}
+              durationSeconds={previewState.durationMinutes * 60 + previewState.durationSeconds}
+              progressPercentage={previewState.progressPercentage}
+              isPlaying={previewState.isPlaying}
+              onPlayPauseToggle={handlePlayPauseToggle}
+              themeMode={themeMode}
+            />
+            <div className="flex gap-2 mt-4 mb-6 justify-center">
+                <Button 
+                    onClick={() => setThemeMode('light')} 
+                    disabled={themeMode === 'light' || isProcessingPayment}
+                    variant={themeMode === 'light' ? "default" : "outline"}
+                >
+                    Elementos Negros
+                </Button>
+                <Button 
+                    onClick={() => setThemeMode('dark')} 
+                    disabled={themeMode === 'dark' || isProcessingPayment}
+                    variant={themeMode === 'dark' ? "default" : "outline"}
+                >
+                    Elementos Blancos
+                </Button>
+            </div>
+        </div>
+
+        <Separator className="w-full max-w-md" />
+        
         <CoverForm
           initialValues={previewState}
           onFormChange={handleFormChange}
           onDownload={handleInitiateDownload}
           isProcessingPayment={isProcessingPayment}
-        />
-        <Separator />
-        <div className="flex gap-2 mb-4">
-            <Button 
-                onClick={() => setThemeMode('light')} 
-                disabled={themeMode === 'light' || isProcessingPayment}
-                variant={themeMode === 'light' ? "default" : "outline"}
-            >
-                Elementos Negros
-            </Button>
-            <Button 
-                onClick={() => setThemeMode('dark')} 
-                disabled={themeMode === 'dark' || isProcessingPayment}
-                variant={themeMode === 'dark' ? "default" : "outline"}
-            >
-                Elementos Blancos
-            </Button>
-        </div>
-        <CoverPreview
-          ref={coverPreviewRef}
-          songTitle={previewState.songTitle}
-          artistName={previewState.artistName}
-          imageUrl={previewState.coverImageUrl}
-          durationSeconds={previewState.durationMinutes * 60 + previewState.durationSeconds}
-          progressPercentage={previewState.progressPercentage}
-          isPlaying={previewState.isPlaying}
-          onPlayPauseToggle={handlePlayPauseToggle}
-          themeMode={themeMode}
         />
       </main>
 
