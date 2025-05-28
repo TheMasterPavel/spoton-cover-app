@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { createCheckoutSession } from '@/lib/stripeActions';
+import { createCheckoutSession } from '@/lib/stripeActions'; // Importar la Server Action
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -34,13 +34,15 @@ const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   progressPercentage: 40,
 };
 
+// Promesa para cargar Stripe.js solo una vez
 let stripePromise: Promise<Stripe | null> | null = null;
 const getStripe = () => {
   if (!stripePromise) {
     const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-    console.log('Stripe Publishable Key:', publishableKey); // Debug log
+    console.log('Stripe Publishable Key:', publishableKey); // LOG
     if (!publishableKey) {
       console.error("La clave publicable de Stripe (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) no está configurada en las variables de entorno.");
+      // No se muestra toast aquí directamente, el fallo se maneja en handleStripeCheckout
       return Promise.resolve(null);
     }
     stripePromise = loadStripe(publishableKey);
@@ -87,15 +89,17 @@ export default function HomePage() {
          updatedState.progressPercentage = initialFormValues.progressPercentage;
       }
       
-      if (newValues.hasOwnProperty('coverImageFile')) { 
+      // Manejo específico para la imagen para evitar reseteos no deseados
+      if (newValues.hasOwnProperty('coverImageFile')) { // Si coverImageFile está en newValues, es una subida directa
         updatedState.coverImageFile = newValues.coverImageFile;
-        updatedState.coverImageUrl = newValues.coverImageUrl ?? currentPreviewState.coverImageUrl; 
-      } else if (newValues.hasOwnProperty('coverImageUrl')) { 
+        updatedState.coverImageUrl = newValues.coverImageUrl ?? currentPreviewState.coverImageUrl; // Usar la nueva URL si existe
+      } else if (newValues.hasOwnProperty('coverImageUrl')) { // Si solo coverImageUrl está, es de la IA o un placeholder
         updatedState.coverImageUrl = newValues.coverImageUrl;
-        if (newValues.coverImageUrl !== currentPreviewState.coverImageUrl) { 
+        if (newValues.coverImageUrl !== currentPreviewState.coverImageUrl) { // Si la URL cambió, resetear el FileList
             updatedState.coverImageFile = undefined;
         }
       }
+      // Si ni coverImageFile ni coverImageUrl están en newValues, se conservan los valores actuales de updatedState
       
       return updatedState;
     });
@@ -105,6 +109,7 @@ export default function HomePage() {
     setPreviewState(prevState => ({ ...prevState, isPlaying: !prevState.isPlaying }));
   }, []);
 
+  // Asegura que siempre haya una imagen de portada (placeholder si es necesario)
   useEffect(() => {
     if (!previewState.coverImageUrl && !previewState.coverImageFile && initialFormValues.coverImageUrl) { 
       setPreviewState(prevState => ({
@@ -137,24 +142,27 @@ export default function HomePage() {
         return;
     }
 
+    // Capturar dimensiones del contenedor de imagen real
     const oicWidth = originalImageContainer.offsetWidth;
     const oicHeight = originalImageContainer.offsetHeight;
 
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Pequeña demora para asegurar que las fuentes y estilos se apliquen
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Aumentada ligeramente
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null,
-        logging: true, 
+        backgroundColor: null, // Para fondo transparente
+        logging: true, // Habilitar logs para depuración
         width: elementToCapture.offsetWidth,
         height: elementToCapture.offsetHeight,
-        scale: 2, 
+        scale: 2, // Usar devicePixelRatio para mejor calidad en pantallas HiDPI
         scrollX: 0,
-        scrollY: typeof window !== 'undefined' ? -window.scrollY : 0,
+        scrollY: typeof window !== 'undefined' ? -window.scrollY : 0, // Manejar scroll de la página
         onclone: (documentClone) => {
+          // Forzar fondo transparente para el clon que usa html2canvas
           documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
           documentClone.body.style.setProperty('background-color', 'transparent', 'important');
           
@@ -164,14 +172,15 @@ export default function HomePage() {
 
           if (clonedCard) {
             clonedCard.style.setProperty('background-color', 'transparent', 'important');
-            clonedCard.style.boxShadow = 'none';
-            clonedCard.style.border = 'none';
+            clonedCard.style.boxShadow = 'none'; // Quitar sombra para la descarga
+            clonedCard.style.border = 'none'; // Quitar borde para la descarga
           }
           if (clonedCardContent) {
             clonedCardContent.style.setProperty('background-color', 'transparent', 'important');
           }
 
           if (imageContainerClone) {
+            // Aplicar dimensiones capturadas al clon
             imageContainerClone.style.width = `${oicWidth}px`;
             imageContainerClone.style.height = `${oicHeight}px`;
 
@@ -184,11 +193,12 @@ export default function HomePage() {
                 // Ensure no conflicting background color if image is present
                 imageContainerClone.style.backgroundColor = ''; 
             } else {
-                imageContainerClone.style.backgroundImage = ''; 
+                // Si no hay imagen, el placeholder SVG está dentro, asegurar fondo transparente
+                imageContainerClone.style.backgroundImage = ''; // Limpiar por si acaso
                 imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
             }
-            imageContainerClone.style.borderRadius = '0.375rem'; 
-            imageContainerClone.style.overflow = 'hidden';
+            imageContainerClone.style.borderRadius = '0.375rem'; // Mantener el borde redondeado del contenedor
+            imageContainerClone.style.overflow = 'hidden'; // Importante para que el cover no se salga
           }
         },
       });
@@ -215,35 +225,37 @@ export default function HomePage() {
         duration: 5000,
       });
     }
-  }, [previewState.coverImageUrl, toast]); 
+  }, [previewState.coverImageUrl, toast]); // oicWidth y oicHeight se definen dentro, no son dependencias.
 
+  // Abre el diálogo de pago
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
   };
 
+  // Maneja el proceso de checkout con Stripe
   const handleStripeCheckout = async () => {
-    console.log('handleStripeCheckout: Iniciando proceso de pago...');
-    setIsProcessingPayment(true);
+    console.log('handleStripeCheckout: Iniciando proceso de pago...'); // LOG 1
+    setIsProcessingPayment(true); // Disable buttons
 
     try {
-      console.log('handleStripeCheckout: Guardando estado en localStorage...');
+      console.log('handleStripeCheckout: Guardando estado en localStorage...'); // LOG 2
       localStorage.setItem('spotOnCoverPreviewState', JSON.stringify(previewState));
     } catch (e) {
-      console.error("handleStripeCheckout: Error al guardar estado en localStorage:", e);
+      console.error("handleStripeCheckout: Error al guardar estado en localStorage:", e); // LOG 2.E
       toast({
         title: "Error",
         description: "No se pudo guardar el estado de tu portada.",
         variant: "destructive",
         duration: 3000,
       });
-      setIsProcessingPayment(false);
-      setIsPaymentDialogOpen(false);
+      setIsProcessingPayment(false); // Re-enable buttons
+      setIsPaymentDialogOpen(false); // Close dialog
       return;
     }
 
-    console.log('handleStripeCheckout: Llamando a createCheckoutSession Server Action...');
+    console.log('handleStripeCheckout: Llamando a createCheckoutSession Server Action...'); // LOG 3
     const { sessionId, error: sessionError } = await createCheckoutSession();
-    console.log('handleStripeCheckout: Resultado de createCheckoutSession:', { sessionId, sessionError });
+    console.log('handleStripeCheckout: Resultado de createCheckoutSession:', { sessionId, sessionError }); // LOG 4
 
     if (sessionError || !sessionId) {
       toast({
@@ -252,15 +264,15 @@ export default function HomePage() {
         variant: 'destructive',
         duration: 5000,
       });
-      localStorage.removeItem('spotOnCoverPreviewState');
-      setIsProcessingPayment(false);
-      setIsPaymentDialogOpen(false);
+      localStorage.removeItem('spotOnCoverPreviewState'); // Clean up if session creation failed
+      setIsProcessingPayment(false); // Re-enable buttons
+      setIsPaymentDialogOpen(false); // Close dialog
       return;
     }
 
-    console.log('handleStripeCheckout: Obteniendo instancia de Stripe.js...');
+    console.log('handleStripeCheckout: Obteniendo instancia de Stripe.js...'); // LOG 5
     const stripe = await getStripe();
-    console.log('handleStripeCheckout: Instancia de Stripe.js obtenida:', stripe ? 'Éxito' : 'Fallo');
+    console.log('handleStripeCheckout: Instancia de Stripe.js obtenida:', stripe ? 'Éxito' : 'Fallo'); // LOG 6
 
     if (!stripe) {
       toast({
@@ -269,30 +281,33 @@ export default function HomePage() {
         variant: 'destructive',
         duration: 5000,
       });
-      localStorage.removeItem('spotOnCoverPreviewState');
-      setIsProcessingPayment(false);
-      setIsPaymentDialogOpen(false);
+      localStorage.removeItem('spotOnCoverPreviewState'); // Clean up
+      setIsProcessingPayment(false); // Re-enable buttons
+      setIsPaymentDialogOpen(false); // Close dialog
       return;
     }
 
-    console.log('handleStripeCheckout: Redirigiendo a Stripe Checkout con session ID:', sessionId);
+    console.log('handleStripeCheckout: Redirigiendo a Stripe Checkout con session ID:', sessionId); // LOG 7
     const { error } = await stripe.redirectToCheckout({ sessionId });
 
     if (error) {
-      console.error('handleStripeCheckout: Error al redirigir a Stripe:', error);
+      console.error('handleStripeCheckout: Error al redirigir a Stripe:', error); // LOG 7.E
       toast({
         title: 'Error al Redirigir',
         description: error.message || 'No se pudo redirigir a Stripe.',
         variant: 'destructive',
         duration: 5000,
       });
-      localStorage.removeItem('spotOnCoverPreviewState');
-      setIsProcessingPayment(false); // Asegúrate de resetear en caso de error de redirección
-      setIsPaymentDialogOpen(false); // Cierra el diálogo si falla la redirección
+      localStorage.removeItem('spotOnCoverPreviewState'); // Clean up
+      // Si redirectToCheckout falla, el usuario sigue en la página, así que reseteamos estado.
+      setIsProcessingPayment(false);
+      setIsPaymentDialogOpen(false); // Cierra el diálogo si la redirección falla
     }
-    // Si la redirección es exitosa, no se necesita resetear isProcessingPayment aquí porque la página cambiará.
+    // Si la redirección es exitosa, no se necesita resetear isProcessingPayment aquí
+    // porque la página cambiará. El diálogo se cerrará por el cambio de página.
   };
 
+  // Efecto para manejar el retorno de Stripe
   useEffect(() => {
     const paymentSuccess = searchParams.get('payment_success');
     const paymentCanceled = searchParams.get('payment_canceled');
@@ -309,19 +324,23 @@ export default function HomePage() {
       if (savedStateString) {
         try {
           const savedState = JSON.parse(savedStateString);
+          // Es crucial restaurar el estado ANTES de llamar a captureAndDownloadCover
           setPreviewState(savedState); 
+          // Pequeña demora para asegurar que el estado se aplique al DOM antes de capturar
           setTimeout(() => {
              captureAndDownloadCover();
-          }, 500); 
+          }, 500); // Ajusta si es necesario
         } catch (e) {
           console.error("useEffect: Error al restaurar estado desde localStorage tras pago exitoso:", e);
+          // Intenta descargar de todas formas si la restauración falla
           captureAndDownloadCover();
         }
       } else {
-         console.warn("useEffect: No se encontró estado guardado para restaurar tras pago exitoso.");
+         console.warn("useEffect: No se encontró estado guardado para restaurar tras pago exitoso. Descargando con estado actual.");
          captureAndDownloadCover();
       }
       localStorage.removeItem('spotOnCoverPreviewState');
+      // Limpiar parámetros de la URL
       if (currentPath) router.replace(currentPath, { scroll: false }); 
     } else if (paymentCanceled === 'true') {
       console.log('useEffect: Pago cancelado detectado.');
@@ -335,7 +354,7 @@ export default function HomePage() {
        if (savedStateString) {
         try {
           const savedState = JSON.parse(savedStateString);
-          setPreviewState(savedState); 
+          setPreviewState(savedState); // Restaurar estado
         } catch (e) {
           console.error("useEffect: Error al restaurar estado desde localStorage tras pago cancelado:", e);
         }
@@ -343,9 +362,9 @@ export default function HomePage() {
         console.warn("useEffect: No se encontró estado guardado para restaurar tras pago cancelado.");
       }
       localStorage.removeItem('spotOnCoverPreviewState');
-      if (currentPath) router.replace(currentPath, { scroll: false }); 
+      if (currentPath) router.replace(currentPath, { scroll: false }); // Limpiar parámetros URL
     }
-  }, [searchParams, router, toast, captureAndDownloadCover]);
+  }, [searchParams, router, toast, captureAndDownloadCover]); // captureAndDownloadCover es una dependencia
 
 
   return (
@@ -386,7 +405,7 @@ export default function HomePage() {
         <CoverForm
           initialValues={previewState}
           onFormChange={handleFormChange}
-          onDownload={handleInitiateDownload}
+          onDownload={handleInitiateDownload} // Esto abre el diálogo de pago
           isProcessingPayment={isProcessingPayment}
         />
       </main>
