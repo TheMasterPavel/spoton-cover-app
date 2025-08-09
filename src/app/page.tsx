@@ -112,60 +112,74 @@ export default function HomePage() {
         coverImageUrl: initialFormValues.coverImageUrl
       }));
     }
-  }, [previewState.coverImageUrl, previewState.coverImageFile, initialFormValues.coverImageUrl]);
+  }, [previewState.coverImageUrl, previewState.coverImageFile]);
   
   const captureAndDownloadCover = useCallback(async () => {
-    console.log('LOG: Iniciando captura y descarga...');
+    console.log('LOG: captureAndDownloadCover: Iniciando captura y descarga...');
     const elementToCapture = coverPreviewRef.current;
     
     if (!elementToCapture) {
       toast({
         title: 'Error de Descarga',
-        description: 'El elemento a capturar no existe. No se puede descargar.',
+        description: 'El elemento de previsualización no fue encontrado. No se puede descargar.',
         variant: 'destructive',
         duration: 5000,
       });
-      console.error('LOG ERROR: El ref `coverPreviewRef.current` es nulo.');
+      console.error('LOG ERROR: captureAndDownloadCover: El ref `coverPreviewRef.current` es nulo.');
       return;
     }
 
     try {
-      console.log('LOG: Llamando a html2canvas...');
+      console.log('LOG: captureAndDownloadCover: Llamando a html2canvas...');
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true, 
-        backgroundColor: null,
-        scale: 2,
-        onclone: (documentClone) => {
-          const imageContainerClone = documentClone.getElementById('cover-image-container');
-          if (imageContainerClone && previewState.coverImageUrl) {
-            return new Promise((resolve) => {
-              const img = new Image();
-              img.crossOrigin = "anonymous";
-              img.onload = () => {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = img.width;
-                tempCanvas.height = img.height;
-                const ctx = tempCanvas.getContext('2d');
-                if (ctx) {
-                  ctx.drawImage(img, 0, 0);
-                  const dataURL = tempCanvas.toDataURL('image/png');
-                  imageContainerClone.style.backgroundImage = `url(${dataURL})`;
-                }
-                resolve();
-              };
-              img.onerror = () => {
-                 console.error('LOG ERROR: La imagen no se pudo cargar desde la URL:', previewState.coverImageUrl);
-                 resolve(); // Resolve anyway to not block the process
-              };
-              img.src = previewState.coverImageUrl;
-            });
-          }
-          return Promise.resolve();
+        backgroundColor: null, // Para fondo transparente
+        scale: 2, // Aumentar resolución
+        onclone: (documentClone, elementClone) => {
+            const imageContainerClone = elementClone.querySelector('#cover-image-container');
+            if (imageContainerClone && previewState.coverImageUrl) {
+                // Capturar dimensiones reales del contenedor de la imagen en el DOM original
+                const oic = elementToCapture.querySelector('#cover-image-container');
+                if (!oic) return Promise.resolve();
+
+                const oicWidth = oic.clientWidth;
+                const oicHeight = oic.clientHeight;
+
+                // Aplicar dimensiones capturadas al clon
+                (imageContainerClone as HTMLElement).style.width = `${oicWidth}px`;
+                (imageContainerClone as HTMLElement).style.height = `${oicHeight}px`;
+
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = "anonymous"; // Importante para CORS
+                    img.onload = () => {
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = img.naturalWidth;
+                        tempCanvas.height = img.naturalHeight;
+                        const ctx = tempCanvas.getContext('2d');
+                        if (ctx) {
+                            ctx.drawImage(img, 0, 0);
+                            const dataURL = tempCanvas.toDataURL('image/png');
+                            (imageContainerClone as HTMLElement).style.backgroundImage = `url(${dataURL})`;
+                            (imageContainerClone as HTMLElement).style.backgroundSize = 'cover';
+                            (imageContainerClone as HTMLElement).style.backgroundPosition = 'center';
+                        }
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        console.error('LOG ERROR: La imagen no se pudo cargar desde la URL:', previewState.coverImageUrl);
+                        resolve(); // Resolver de todos modos para no bloquear el proceso
+                    };
+                    // Usar un proxy si es necesario para evitar problemas de CORS, aunque `crossOrigin` debería ayudar
+                    img.src = previewState.coverImageUrl;
+                });
+            }
+            return Promise.resolve();
         },
       });
       
-      console.log('LOG: html2canvas completado. Creando URL de la imagen...');
+      console.log('LOG: captureAndDownloadCover: html2canvas completado. Creando URL de la imagen...');
       const imageUrl = canvas.toDataURL('image/png');
       
       const link = document.createElement('a');
@@ -181,10 +195,10 @@ export default function HomePage() {
         description: 'Tu portada personalizada se está descargando.',
         duration: 3000,
       });
-      console.log('LOG: Descarga iniciada exitosamente.');
+      console.log('LOG: captureAndDownloadCover: Descarga iniciada exitosamente.');
 
     } catch (error) {
-      console.error('LOG ERROR: Fallo en html2canvas:', error);
+      console.error('LOG ERROR: captureAndDownloadCover: Fallo en html2canvas:', error);
       toast({
         title: 'Error de Descarga',
         description: (error instanceof Error ? `html2canvas falló: ${error.message}` : 'No se pudo generar la imagen. Revisa la consola para más detalles.'),
@@ -193,6 +207,7 @@ export default function HomePage() {
       });
     }
   }, [toast, previewState.coverImageUrl]);
+
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
@@ -418,3 +433,5 @@ export default function HomePage() {
     </>
   );
 }
+
+    
