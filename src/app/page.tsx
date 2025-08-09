@@ -115,75 +115,36 @@ export default function HomePage() {
   }, [previewState.coverImageUrl, previewState.coverImageFile, initialFormValues.coverImageUrl]);
   
   const captureAndDownloadCover = useCallback(async () => {
-    console.log('LOG: captureAndDownloadCover: Iniciando captura...');
+    console.log('LOG: Iniciando captura y descarga...');
     const elementToCapture = coverPreviewRef.current;
+    
     if (!elementToCapture) {
       toast({
         title: 'Error de Descarga',
-        description: 'No se pudo encontrar el elemento de previsualización para descargar.',
+        description: 'El elemento a capturar no existe. No se puede descargar.',
         variant: 'destructive',
-        duration: 4000,
+        duration: 5000,
       });
-      console.error('LOG: captureAndDownloadCover: Elemento de previsualización no encontrado.');
+      console.error('LOG ERROR: El ref `coverPreviewRef.current` es nulo.');
       return;
     }
 
     try {
-      console.log('LOG: captureAndDownloadCover: Llamando a html2canvas...');
-
+      console.log('LOG: Llamando a html2canvas...');
       const canvas = await html2canvas(elementToCapture, {
-        allowTaint: true,
-        useCORS: true,
-        backgroundColor: null, // Importante para la transparencia
-        logging: true,
-        scale: 2, // Mejor calidad
-        onclone: (documentClone) => {
-          const imageContainerClone = documentClone.getElementById('cover-image-container');
-          if (imageContainerClone) {
-            // Ocultamos la imagen de fondo original, la pintaremos manualmente en el canvas final
-            imageContainerClone.style.backgroundImage = 'none';
-          }
-        }
+        allowTaint: true, // Permite imágenes de otros dominios (puede "ensuciar" el canvas)
+        useCORS: true, // Intenta cargar imágenes con CORS para evitar ensuciar el canvas
+        backgroundColor: null, // Mantiene la transparencia si existe
+        scale: 2, // Aumenta la resolución para mejor calidad
       });
-
-      console.log('LOG: captureAndDownloadCover: html2canvas completado. Procesando imagen de portada si existe...');
-
-      // Si hay una imagen de portada, la dibujamos sobre el canvas que acabamos de crear.
-      if (previewState.coverImageUrl) {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          const image = new Image();
-          image.crossOrigin = 'Anonymous'; // Necesario para imágenes de otros dominios
-          
-          const imageLoadedPromise = new Promise((resolve, reject) => {
-            image.onload = () => {
-              console.log('LOG: captureAndDownloadCover: Imagen de portada cargada exitosamente.');
-              // Coordenadas y tamaño del contenedor de la imagen
-              const imageContainer = elementToCapture.querySelector('#cover-image-container');
-              if (imageContainer) {
-                const rect = imageContainer.getBoundingClientRect();
-                const scale = 2; // Debe coincidir con la escala de html2canvas
-                // Dibujamos la imagen en el canvas en la posición correcta
-                ctx.drawImage(image, rect.left * scale, rect.top * scale, rect.width * scale, rect.height * scale);
-              }
-              resolve(true);
-            };
-            image.onerror = (err) => {
-              console.error('LOG ERROR: captureAndDownloadCover: Error al cargar la imagen de portada:', err);
-              reject(new Error('No se pudo cargar la imagen de la portada para la descarga.'));
-            };
-          });
-
-          image.src = previewState.coverImageUrl;
-          await imageLoadedPromise;
-        }
-      }
-
-      console.log('LOG: captureAndDownloadCover: Procesamiento de imagen finalizado. Creando enlace de descarga...');
+      
+      console.log('LOG: html2canvas completado. Creando URL de la imagen...');
       const imageUrl = canvas.toDataURL('image/png');
+      
       const link = document.createElement('a');
       link.href = imageUrl;
       link.download = 'spoton_cover.png';
+      
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -193,17 +154,18 @@ export default function HomePage() {
         description: 'Tu portada personalizada se está descargando.',
         duration: 3000,
       });
-      console.log('LOG: captureAndDownloadCover: Descarga iniciada.');
+      console.log('LOG: Descarga iniciada exitosamente.');
+
     } catch (error) {
-      console.error('LOG ERROR: captureAndDownloadCover: Error al generar la imagen:', error);
+      console.error('LOG ERROR: Fallo en html2canvas:', error);
       toast({
         title: 'Error de Descarga',
-        description: (error instanceof Error ? error.message : 'No se pudo generar la imagen de la portada. Revisa la consola e inténtalo de nuevo.'),
+        description: (error instanceof Error ? `html2canvas falló: ${error.message}` : 'No se pudo generar la imagen. Revisa la consola para más detalles.'),
         variant: 'destructive',
         duration: 5000,
       });
     }
-  }, [toast, previewState.coverImageUrl]);
+  }, [toast]); // Solo depende de `toast` ya que el resto se lee de refs o se pasa directamente
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
