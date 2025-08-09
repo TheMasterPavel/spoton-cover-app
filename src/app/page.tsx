@@ -104,20 +104,10 @@ export default function HomePage() {
     setPreviewState(prevState => ({ ...prevState, isPlaying: !prevState.isPlaying }));
   }, []);
 
-  useEffect(() => {
-    // If no image is actively set (neither URL nor file), AND there's a default placeholder, use it.
-    if (!previewState.coverImageUrl && !previewState.coverImageFile && initialFormValues.coverImageUrl) { 
-      setPreviewState(prevState => ({
-        ...prevState,
-        coverImageUrl: initialFormValues.coverImageUrl
-      }));
-    }
-  }, [previewState.coverImageUrl, previewState.coverImageFile]);
-  
   const captureAndDownloadCover = useCallback(async () => {
     console.log('LOG: captureAndDownloadCover: Iniciando captura y descarga...');
     const elementToCapture = coverPreviewRef.current;
-    
+
     if (!elementToCapture) {
       toast({
         title: 'Error de Descarga',
@@ -133,18 +123,27 @@ export default function HomePage() {
       console.log('LOG: captureAndDownloadCover: Llamando a html2canvas...');
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
-        useCORS: true, 
-        backgroundColor: null, // Para fondo transparente
-        scale: 2, // Aumentar resolución
+        useCORS: true,
+        backgroundColor: null,
+        scale: 2,
+        onclone: (documentClone) => {
+            const imageContainerClone = documentClone.getElementById('cover-image-container');
+            const oic = elementToCapture.querySelector('#cover-image-container');
+            if (oic && imageContainerClone) {
+                const oicRect = oic.getBoundingClientRect();
+                imageContainerClone.style.width = `${oicRect.width}px`;
+                imageContainerClone.style.height = `${oicRect.height}px`;
+            }
+        },
       });
-      
+
       console.log('LOG: captureAndDownloadCover: html2canvas completado. Creando URL de la imagen...');
       const imageUrl = canvas.toDataURL('image/png');
-      
+
       const link = document.createElement('a');
       link.href = imageUrl;
       link.download = 'spoton_cover.png';
-      
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -178,6 +177,7 @@ export default function HomePage() {
 
     try {
       localStorage.setItem('spotOnCoverPreviewState', JSON.stringify(previewState));
+      console.log('LOG 2: handleStripeCheckout: Guardando estado en localStorage...', previewState);
     } catch (e) {
       console.error("LOG ERROR: handleStripeCheckout: Error al guardar estado en localStorage:", e);
       toast({
@@ -190,7 +190,10 @@ export default function HomePage() {
       return;
     }
 
+    console.log('LOG 3: handleStripeCheckout: Llamando a createCheckoutSession Server Action...');
     const { sessionId, error: sessionError } = await createCheckoutSession();
+    console.log('LOG 4: handleStripeCheckout: Resultado de createCheckoutSession:', { sessionId, sessionError });
+
 
     if (sessionError || !sessionId) {
       toast({
@@ -204,7 +207,10 @@ export default function HomePage() {
       return;
     }
 
+    console.log('LOG 5: handleStripeCheckout: Obteniendo instancia de Stripe.js...');
     const stripe = await getStripe();
+    console.log('LOG 6: handleStripeCheckout: Instancia de Stripe.js obtenida:', stripe ? 'Éxito' : 'Fallo');
+
 
     if (!stripe) {
       toast({
@@ -230,7 +236,8 @@ export default function HomePage() {
       console.error('LOG 7.E: handleStripeCheckout: Fallo la redirección a Stripe.', error);
       let description = 'No se pudo redirigir a la página de pago. Revisa la consola.';
       
-      if (error instanceof SecurityError) {
+      // Catches the specific iframe/sandbox security error.
+      if (error instanceof Error && error.name === 'SecurityError') {
         description = "La vista previa de desarrollo está bloqueando la redirección. Por favor, abre la aplicación en una nueva pestaña (usando tu URL de localhost) para completar el pago.";
       }
       
@@ -388,5 +395,3 @@ export default function HomePage() {
     </>
   );
 }
-
-    
