@@ -127,90 +127,63 @@ export default function HomePage() {
       console.error('LOG: captureAndDownloadCover: Elemento de previsualización no encontrado.');
       return;
     }
-    
-    const originalImageContainer = elementToCapture.querySelector<HTMLDivElement>('#cover-image-container');
-    if (!originalImageContainer) {
-        toast({
-            title: 'Error de Descarga',
-            description: 'No se pudo encontrar el sub-elemento contenedor de la imagen original.',
-            variant: 'destructive',
-            duration: 4000,
-        });
-        console.error('LOG: captureAndDownloadCover: Contenedor de imagen original no encontrado.');
-        return;
-    }
-
-    const oicWidth = originalImageContainer.offsetWidth;
-    const oicHeight = originalImageContainer.offsetHeight;
-    console.log('LOG: captureAndDownloadCover: Dimensiones del contenedor de imagen original:', oicWidth, oicHeight);
-    console.log('LOG: captureAndDownloadCover: Imagen a capturar (previewState.coverImageUrl):', previewState.coverImageUrl);
-
 
     try {
-      // Pequeña demora para asegurar que todo está renderizado, especialmente la imagen de fondo
-      await new Promise(resolve => setTimeout(resolve, 1500));
       console.log('LOG: captureAndDownloadCover: Llamando a html2canvas...');
 
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
         backgroundColor: null, // Importante para la transparencia
-        logging: true, // Habilitar logs de html2canvas
-        width: elementToCapture.offsetWidth,
-        height: elementToCapture.offsetHeight,
-        scale: 2, // Para mejor calidad en pantallas de alta densidad
-        scrollX: 0,
-        scrollY: typeof window !== 'undefined' ? -window.scrollY : 0,
+        logging: true,
+        scale: 2, // Mejor calidad
         onclone: (documentClone) => {
-          console.log('LOG: html2canvas onclone: Modificando DOM clonado...');
-          // Forzar fondo transparente en el clon
-          documentClone.documentElement.style.setProperty('background-color', 'transparent', 'important');
-          documentClone.body.style.setProperty('background-color', 'transparent', 'important');
-          
-          const clonedCard = documentClone.getElementById('cover-preview-for-canvas');
-          const clonedCardContent = documentClone.getElementById('card-content-for-canvas');
           const imageContainerClone = documentClone.getElementById('cover-image-container');
-
-          if (clonedCard) {
-            clonedCard.style.setProperty('background-color', 'transparent', 'important');
-            clonedCard.style.boxShadow = 'none';
-            clonedCard.style.border = 'none';
-             console.log('LOG: html2canvas onclone: Card clonada a transparente.');
-          }
-          if (clonedCardContent) {
-            clonedCardContent.style.setProperty('background-color', 'transparent', 'important');
-             console.log('LOG: html2canvas onclone: CardContent clonado a transparente.');
-          }
-
           if (imageContainerClone) {
-            // Aplicar dimensiones capturadas al clon
-            imageContainerClone.style.width = oicWidth + 'px';
-            imageContainerClone.style.height = oicHeight + 'px';
-
-            if (previewState.coverImageUrl) {
-                console.log('LOG: html2canvas onclone: Aplicando backgroundImage al imageContainerClone:', previewState.coverImageUrl);
-                imageContainerClone.style.backgroundImage = `url(${previewState.coverImageUrl})`;
-                imageContainerClone.style.backgroundSize = 'cover';
-                imageContainerClone.style.backgroundPosition = 'center';
-                imageContainerClone.style.backgroundRepeat = 'no-repeat';
-                imageContainerClone.style.backgroundColor = ''; // Asegurar que no haya color de fondo si hay imagen
-            } else {
-                // Si no hay imagen, el contenedor debe ser transparente para el placeholder SVG
-                console.log('LOG: html2canvas onclone: No hay coverImageUrl, imageContainerClone a transparente.');
-                imageContainerClone.style.backgroundImage = '';
-                imageContainerClone.style.setProperty('background-color', 'transparent', 'important');
-            }
-            imageContainerClone.style.borderRadius = '0.375rem'; // Tailwind's rounded-md
-            imageContainerClone.style.overflow = 'hidden';
+            // Ocultamos la imagen de fondo original, la pintaremos manualmente en el canvas final
+            imageContainerClone.style.backgroundImage = 'none';
           }
-        },
+        }
       });
-      console.log('LOG: captureAndDownloadCover: html2canvas completado.');
 
+      console.log('LOG: captureAndDownloadCover: html2canvas completado. Procesando imagen de portada si existe...');
+
+      // Si hay una imagen de portada, la dibujamos sobre el canvas que acabamos de crear.
+      if (previewState.coverImageUrl) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const image = new Image();
+          image.crossOrigin = 'Anonymous'; // Necesario para imágenes de otros dominios
+          
+          const imageLoadedPromise = new Promise((resolve, reject) => {
+            image.onload = () => {
+              console.log('LOG: captureAndDownloadCover: Imagen de portada cargada exitosamente.');
+              // Coordenadas y tamaño del contenedor de la imagen
+              const imageContainer = elementToCapture.querySelector('#cover-image-container');
+              if (imageContainer) {
+                const rect = imageContainer.getBoundingClientRect();
+                const scale = 2; // Debe coincidir con la escala de html2canvas
+                // Dibujamos la imagen en el canvas en la posición correcta
+                ctx.drawImage(image, rect.left * scale, rect.top * scale, rect.width * scale, rect.height * scale);
+              }
+              resolve(true);
+            };
+            image.onerror = (err) => {
+              console.error('LOG ERROR: captureAndDownloadCover: Error al cargar la imagen de portada:', err);
+              reject(new Error('No se pudo cargar la imagen de la portada para la descarga.'));
+            };
+          });
+
+          image.src = previewState.coverImageUrl;
+          await imageLoadedPromise;
+        }
+      }
+
+      console.log('LOG: captureAndDownloadCover: Procesamiento de imagen finalizado. Creando enlace de descarga...');
       const imageUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = imageUrl;
-      link.download = 'spotify_cover.png';
+      link.download = 'spoton_cover.png';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -225,12 +198,12 @@ export default function HomePage() {
       console.error('LOG ERROR: captureAndDownloadCover: Error al generar la imagen:', error);
       toast({
         title: 'Error de Descarga',
-        description: 'No se pudo generar la imagen de la portada. Revisa la consola e inténtalo de nuevo.',
+        description: (error instanceof Error ? error.message : 'No se pudo generar la imagen de la portada. Revisa la consola e inténtalo de nuevo.'),
         variant: 'destructive',
         duration: 5000,
       });
     }
-  }, [toast, previewState.coverImageUrl]); 
+  }, [toast, previewState.coverImageUrl]);
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
@@ -337,7 +310,7 @@ export default function HomePage() {
              console.log('LOG STRIPE SUCCESS: localStorage limpiado.');
              if (currentPath) router.replace(currentPath, { scroll: false }); // Limpiar URL
              console.log('LOG STRIPE SUCCESS: URL limpiada.');
-          }, 500); // 500ms de demora
+          }, 1000); // 1000ms de demora para asegurar renderizado completo de la imagen
         } catch (e) {
           console.error("LOG STRIPE SUCCESS: Error al restaurar estado desde localStorage:", e);
           // Intentar descargar con el estado actual como fallback, aunque podría no ser el correcto
@@ -456,5 +429,3 @@ export default function HomePage() {
     </>
   );
 }
-
-    
