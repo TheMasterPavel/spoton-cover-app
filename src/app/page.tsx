@@ -222,17 +222,15 @@ export default function HomePage() {
       console.log('LOG 7: handleStripeCheckout: Redirigiendo a Stripe Checkout con session ID:', sessionId);
       const { error } = await stripe.redirectToCheckout({ sessionId });
 
-      // Si redirectToCheckout falla, mostrará un error propio, pero si es una SecurityError, la capturaremos.
       if (error) {
         console.error('LOG 7.E: handleStripeCheckout: Error al redirigir a Stripe:', error);
-        throw error; // Lanzar el error para que lo capture el catch
+        throw error;
       }
     } catch (error: any) {
       console.error('LOG 7.E: handleStripeCheckout: Fallo la redirección a Stripe.', error);
       let description = 'No se pudo redirigir a la página de pago. Revisa la consola.';
       
-      // Detectar el error de iframe (sandbox)
-      if (error instanceof SecurityError && error.message.includes("sandboxed")) {
+      if (error instanceof SecurityError) {
         description = "La vista previa de desarrollo está bloqueando la redirección. Por favor, abre la aplicación en una nueva pestaña (usando tu URL de localhost) para completar el pago.";
       }
       
@@ -240,10 +238,9 @@ export default function HomePage() {
         title: 'Error de Redirección',
         description: description,
         variant: 'destructive',
-        duration: 10000, // Dejar el mensaje más tiempo
+        duration: 10000,
       });
       
-      // Limpiar y resetear el estado para que el usuario pueda intentarlo de nuevo (en una nueva pestaña)
       localStorage.removeItem('spotOnCoverPreviewState');
       setIsProcessingPayment(false);
       setIsPaymentDialogOpen(false);
@@ -271,26 +268,23 @@ export default function HomePage() {
           console.log('LOG STRIPE SUCCESS: Estado parseado de localStorage:', savedState);
           setPreviewState(savedState); 
           console.log('LOG STRIPE SUCCESS: setPreviewState llamado con estado guardado. Programando descarga...');
-          // Dar tiempo a React para actualizar el estado y re-renderizar antes de capturar
           setTimeout(() => {
              console.log('LOG STRIPE SUCCESS: Timeout completado, llamando a captureAndDownloadCover.');
              captureAndDownloadCover();
-             localStorage.removeItem('spotOnCoverPreviewState'); // Limpiar después de usar
+             localStorage.removeItem('spotOnCoverPreviewState'); 
              console.log('LOG STRIPE SUCCESS: localStorage limpiado.');
-             if (currentPath) router.replace(currentPath, { scroll: false }); // Limpiar URL
+             if (currentPath) router.replace(currentPath, { scroll: false }); 
              console.log('LOG STRIPE SUCCESS: URL limpiada.');
-          }, 1000); // 1000ms de demora para asegurar renderizado completo de la imagen
+          }, 1000); 
         } catch (e) {
           console.error("LOG STRIPE SUCCESS: Error al restaurar estado desde localStorage:", e);
-          // Intentar descargar con el estado actual como fallback, aunque podría no ser el correcto
           captureAndDownloadCover();
           localStorage.removeItem('spotOnCoverPreviewState');
           if (currentPath) router.replace(currentPath, { scroll: false });
         }
       } else {
          console.warn("LOG STRIPE SUCCESS: No se encontró estado guardado. Intentando descargar con estado actual.");
-         captureAndDownloadCover(); // Podría no ser el estado correcto
-         // No limpiar localStorage si no se encontró nada
+         captureAndDownloadCover(); 
          if (currentPath) router.replace(currentPath, { scroll: false });
       }
     } else if (paymentCanceled === 'true') {
@@ -315,9 +309,9 @@ export default function HomePage() {
       } else {
         console.warn("LOG STRIPE CANCELED: No se encontró estado guardado para restaurar.");
       }
-      localStorage.removeItem('spotOnCoverPreviewState'); // Limpiar en cualquier caso de cancelación
+      localStorage.removeItem('spotOnCoverPreviewState'); 
       console.log('LOG STRIPE CANCELED: localStorage limpiado.');
-      if (currentPath) router.replace(currentPath, { scroll: false }); // Limpiar URL
+      if (currentPath) router.replace(currentPath, { scroll: false }); 
       console.log('LOG STRIPE CANCELED: URL limpiada.');
     }
   }, [searchParams, router, toast, captureAndDownloadCover]);
@@ -367,8 +361,6 @@ export default function HomePage() {
       </main>
 
       <AlertDialog open={isPaymentDialogOpen} onOpenChange={(open) => {
-        // Permitir cerrar el diálogo si no se está procesando el pago.
-        // Si se está procesando, el diálogo se gestionará por la lógica de pago.
         if (!isProcessingPayment) {
             setIsPaymentDialogOpen(open);
         }
@@ -396,3 +388,5 @@ export default function HomePage() {
     </>
   );
 }
+
+    
