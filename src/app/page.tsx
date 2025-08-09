@@ -132,10 +132,37 @@ export default function HomePage() {
     try {
       console.log('LOG: Llamando a html2canvas...');
       const canvas = await html2canvas(elementToCapture, {
-        allowTaint: true, // Permite imágenes de otros dominios (puede "ensuciar" el canvas)
-        useCORS: true, // Intenta cargar imágenes con CORS para evitar ensuciar el canvas
-        backgroundColor: null, // Mantiene la transparencia si existe
-        scale: 2, // Aumenta la resolución para mejor calidad
+        allowTaint: true,
+        useCORS: true, 
+        backgroundColor: null,
+        scale: 2,
+        onclone: (documentClone) => {
+          const imageContainerClone = documentClone.getElementById('cover-image-container');
+          if (imageContainerClone && previewState.coverImageUrl) {
+            return new Promise((resolve) => {
+              const img = new Image();
+              img.crossOrigin = "anonymous";
+              img.onload = () => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = img.width;
+                tempCanvas.height = img.height;
+                const ctx = tempCanvas.getContext('2d');
+                if (ctx) {
+                  ctx.drawImage(img, 0, 0);
+                  const dataURL = tempCanvas.toDataURL('image/png');
+                  imageContainerClone.style.backgroundImage = `url(${dataURL})`;
+                }
+                resolve();
+              };
+              img.onerror = () => {
+                 console.error('LOG ERROR: La imagen no se pudo cargar desde la URL:', previewState.coverImageUrl);
+                 resolve(); // Resolve anyway to not block the process
+              };
+              img.src = previewState.coverImageUrl;
+            });
+          }
+          return Promise.resolve();
+        },
       });
       
       console.log('LOG: html2canvas completado. Creando URL de la imagen...');
@@ -165,7 +192,7 @@ export default function HomePage() {
         duration: 5000,
       });
     }
-  }, [toast]); // Solo depende de `toast` ya que el resto se lee de refs o se pasa directamente
+  }, [toast, previewState.coverImageUrl]);
 
   const handleInitiateDownload = () => {
     setIsPaymentDialogOpen(true);
