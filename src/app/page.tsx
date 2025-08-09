@@ -136,47 +136,6 @@ export default function HomePage() {
         useCORS: true, 
         backgroundColor: null, // Para fondo transparente
         scale: 2, // Aumentar resolución
-        onclone: (documentClone, elementClone) => {
-            const imageContainerClone = elementClone.querySelector('#cover-image-container');
-            if (imageContainerClone && previewState.coverImageUrl) {
-                // Capturar dimensiones reales del contenedor de la imagen en el DOM original
-                const oic = elementToCapture.querySelector('#cover-image-container');
-                if (!oic) return Promise.resolve();
-
-                const oicWidth = oic.clientWidth;
-                const oicHeight = oic.clientHeight;
-
-                // Aplicar dimensiones capturadas al clon
-                (imageContainerClone as HTMLElement).style.width = `${oicWidth}px`;
-                (imageContainerClone as HTMLElement).style.height = `${oicHeight}px`;
-
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.crossOrigin = "anonymous"; // Importante para CORS
-                    img.onload = () => {
-                        const tempCanvas = document.createElement('canvas');
-                        tempCanvas.width = img.naturalWidth;
-                        tempCanvas.height = img.naturalHeight;
-                        const ctx = tempCanvas.getContext('2d');
-                        if (ctx) {
-                            ctx.drawImage(img, 0, 0);
-                            const dataURL = tempCanvas.toDataURL('image/png');
-                            (imageContainerClone as HTMLElement).style.backgroundImage = `url(${dataURL})`;
-                            (imageContainerClone as HTMLElement).style.backgroundSize = 'cover';
-                            (imageContainerClone as HTMLElement).style.backgroundPosition = 'center';
-                        }
-                        resolve();
-                    };
-                    img.onerror = () => {
-                        console.error('LOG ERROR: La imagen no se pudo cargar desde la URL:', previewState.coverImageUrl);
-                        resolve(); // Resolver de todos modos para no bloquear el proceso
-                    };
-                    // Usar un proxy si es necesario para evitar problemas de CORS, aunque `crossOrigin` debería ayudar
-                    img.src = previewState.coverImageUrl;
-                });
-            }
-            return Promise.resolve();
-        },
       });
       
       console.log('LOG: captureAndDownloadCover: html2canvas completado. Creando URL de la imagen...');
@@ -218,31 +177,26 @@ export default function HomePage() {
     setIsProcessingPayment(true);
 
     try {
-      console.log('LOG 2: handleStripeCheckout: Guardando estado en localStorage...', previewState);
       localStorage.setItem('spotOnCoverPreviewState', JSON.stringify(previewState));
     } catch (e) {
-      console.error("LOG 2.E: handleStripeCheckout: Error al guardar estado en localStorage:", e);
+      console.error("LOG ERROR: handleStripeCheckout: Error al guardar estado en localStorage:", e);
       toast({
-        title: "Error",
-        description: "No se pudo guardar el estado de tu portada.",
+        title: "Error de Almacenamiento",
+        description: "No se pudo guardar el estado de tu portada en el navegador.",
         variant: "destructive",
-        duration: 3000,
       });
       setIsProcessingPayment(false);
       setIsPaymentDialogOpen(false);
       return;
     }
 
-    console.log('LOG 3: handleStripeCheckout: Llamando a createCheckoutSession Server Action...');
     const { sessionId, error: sessionError } = await createCheckoutSession();
-    console.log('LOG 4: handleStripeCheckout: Resultado de createCheckoutSession:', { sessionId, sessionError });
 
     if (sessionError || !sessionId) {
       toast({
         title: 'Error al Iniciar Pago',
-        description: sessionError || 'No se pudo crear la sesión de pago.',
+        description: sessionError || 'No se pudo crear la sesión de pago. Revisa los logs del servidor.',
         variant: 'destructive',
-        duration: 5000,
       });
       localStorage.removeItem('spotOnCoverPreviewState');
       setIsProcessingPayment(false);
@@ -250,16 +204,13 @@ export default function HomePage() {
       return;
     }
 
-    console.log('LOG 5: handleStripeCheckout: Obteniendo instancia de Stripe.js...');
     const stripe = await getStripe();
-    console.log('LOG 6: handleStripeCheckout: Instancia de Stripe.js obtenida:', stripe ? 'Éxito' : 'Fallo');
 
     if (!stripe) {
       toast({
-        title: 'Error de Stripe',
-        description: 'No se pudo cargar la librería de Stripe. Verifica la clave publicable (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY).',
+        title: 'Error de Configuración',
+        description: 'No se pudo cargar Stripe. Verifica tu clave publicable (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY).',
         variant: 'destructive',
-        duration: 5000,
       });
       localStorage.removeItem('spotOnCoverPreviewState');
       setIsProcessingPayment(false);
@@ -267,24 +218,38 @@ export default function HomePage() {
       return;
     }
 
-    console.log('LOG 7: handleStripeCheckout: Redirigiendo a Stripe Checkout con session ID:', sessionId);
-    const { error } = await stripe.redirectToCheckout({ sessionId });
+    try {
+      console.log('LOG 7: handleStripeCheckout: Redirigiendo a Stripe Checkout con session ID:', sessionId);
+      const { error } = await stripe.redirectToCheckout({ sessionId });
 
-    if (error) {
-      console.error('LOG 7.E: handleStripeCheckout: Error al redirigir a Stripe:', error);
+      // Si redirectToCheckout falla, mostrará un error propio, pero si es una SecurityError, la capturaremos.
+      if (error) {
+        console.error('LOG 7.E: handleStripeCheckout: Error al redirigir a Stripe:', error);
+        throw error; // Lanzar el error para que lo capture el catch
+      }
+    } catch (error: any) {
+      console.error('LOG 7.E: handleStripeCheckout: Fallo la redirección a Stripe.', error);
+      let description = 'No se pudo redirigir a la página de pago. Revisa la consola.';
+      
+      // Detectar el error de iframe (sandbox)
+      if (error instanceof SecurityError && error.message.includes("sandboxed")) {
+        description = "La vista previa de desarrollo está bloqueando la redirección. Por favor, abre la aplicación en una nueva pestaña (usando tu URL de localhost) para completar el pago.";
+      }
+      
       toast({
-        title: 'Error al Redirigir',
-        description: error.message || 'No se pudo redirigir a Stripe.',
+        title: 'Error de Redirección',
+        description: description,
         variant: 'destructive',
-        duration: 5000,
+        duration: 10000, // Dejar el mensaje más tiempo
       });
-      localStorage.removeItem('spotOnCoverPreviewState'); // Limpiar en caso de error de redirección
+      
+      // Limpiar y resetear el estado para que el usuario pueda intentarlo de nuevo (en una nueva pestaña)
+      localStorage.removeItem('spotOnCoverPreviewState');
       setIsProcessingPayment(false);
-      setIsPaymentDialogOpen(false); // Cerrar diálogo en caso de error
+      setIsPaymentDialogOpen(false);
     }
-    // Si la redirección tiene éxito, el usuario abandona esta página, no es necesario setIsProcessingPayment(false) aquí.
   };
-
+  
   useEffect(() => {
     const paymentSuccess = searchParams.get('payment_success');
     const paymentCanceled = searchParams.get('payment_canceled');
@@ -418,8 +383,6 @@ export default function HomePage() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isProcessingPayment} onClick={() => {
                 setIsPaymentDialogOpen(false);
-                // Si el usuario cancela mientras estaba procesando (raro, pero posible si la redirección falla),
-                // resetear el estado de procesamiento.
                 if (isProcessingPayment) setIsProcessingPayment(false); 
             }}>
                 Cancelar
@@ -433,5 +396,3 @@ export default function HomePage() {
     </>
   );
 }
-
-    
