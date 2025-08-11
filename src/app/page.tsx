@@ -5,16 +5,6 @@ import { StripePaymentHandler } from '@/components/StripePaymentHandler';
 import { CoverForm } from '@/components/CoverForm';
 import { CoverPreview } from '@/components/CoverPreview';
 import type { CoverFormValues } from '@/lib/schema';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
@@ -83,15 +73,17 @@ function HomePageContent() {
 
   return (
     <>
-      <StripePaymentHandler
-        previewState={previewState}
-        setPreviewState={setPreviewState}
-        coverPreviewRef={coverPreviewRef}
-        isProcessingPayment={isProcessingPayment}
-        setIsProcessingPayment={setIsProcessingPayment}
-        isPaymentDialogOpen={isPaymentDialogOpen}
-        setIsPaymentDialogOpen={setIsPaymentDialogOpen}
-      />
+      <Suspense fallback={<div>Cargando...</div>}>
+        <StripePaymentHandler
+          previewState={previewState}
+          setPreviewState={setPreviewState}
+          coverPreviewRef={coverPreviewRef}
+          isProcessingPayment={isProcessingPayment}
+          setIsProcessingPayment={setIsProcessingPayment}
+          isPaymentDialogOpen={isPaymentDialogOpen}
+          setIsPaymentDialogOpen={setIsPaymentDialogOpen}
+        />
+      </Suspense>
       <main className="flex flex-col items-center justify-start py-10 px-4 space-y-8 min-h-screen">
         <div className="w-full max-w-sm">
             <CoverPreview
