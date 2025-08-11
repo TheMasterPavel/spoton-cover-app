@@ -58,6 +58,7 @@ export default function HomePage() {
   });
   const coverPreviewRef = useRef<HTMLDivElement>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isRedirectErrorDialogOpen, setIsRedirectErrorDialogOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
@@ -124,17 +125,8 @@ export default function HomePage() {
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null,
-        scale: 2,
-        onclone: (documentClone) => {
-            const imageContainerClone = documentClone.getElementById('cover-image-container');
-            const oic = elementToCapture.querySelector('#cover-image-container');
-            if (oic && imageContainerClone) {
-                const oicRect = oic.getBoundingClientRect();
-                imageContainerClone.style.width = `${oicRect.width}px`;
-                imageContainerClone.style.height = `${oicRect.height}px`;
-            }
-        },
+        backgroundColor: null, 
+        scale: 2, 
       });
 
       console.log('LOG: captureAndDownloadCover: html2canvas completado. Creando URL de la imagen...');
@@ -164,7 +156,7 @@ export default function HomePage() {
         duration: 5000,
       });
     }
-  }, [toast, previewState.coverImageUrl]);
+  }, [toast]);
 
 
   const handleInitiateDownload = () => {
@@ -234,19 +226,18 @@ export default function HomePage() {
       }
     } catch (error: any) {
       console.error('LOG 7.E: handleStripeCheckout: Fallo la redirección a Stripe.', error);
-      let description = 'No se pudo redirigir a la página de pago. Revisa la consola.';
       
       // Catches the specific iframe/sandbox security error.
       if (error instanceof Error && error.name === 'SecurityError') {
-        description = "La vista previa de desarrollo está bloqueando la redirección. Por favor, abre la aplicación en una nueva pestaña (usando tu URL de localhost) para completar el pago.";
+        setIsRedirectErrorDialogOpen(true);
+      } else {
+         toast({
+          title: 'Error de Redirección',
+          description: 'No se pudo redirigir a la página de pago. Revisa la consola.',
+          variant: 'destructive',
+          duration: 10000,
+        });
       }
-      
-      toast({
-        title: 'Error de Redirección',
-        description: description,
-        variant: 'destructive',
-        duration: 10000,
-      });
       
       localStorage.removeItem('spotOnCoverPreviewState');
       setIsProcessingPayment(false);
@@ -392,6 +383,26 @@ export default function HomePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <AlertDialog open={isRedirectErrorDialogOpen} onOpenChange={setIsRedirectErrorDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Error de Redirección a Stripe</AlertDialogTitle>
+            <AlertDialogDescription>
+              <p>La pasarela de pago no se puede abrir porque la aplicación se está ejecutando en una ventana de vista previa con restricciones de seguridad.</p>
+              <p className="font-bold mt-4">Solución:</p>
+              <p>Por favor, abre la URL de desarrollo (normalmente `http://localhost:9002`) en una nueva pestaña de tu navegador para completar el pago.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setIsRedirectErrorDialogOpen(false)}>
+              Entendido
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
+
+    
