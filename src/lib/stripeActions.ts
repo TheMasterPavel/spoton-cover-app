@@ -3,17 +3,30 @@
 
 import Stripe from 'stripe';
 
-// Inicializa Stripe con tu clave secreta
-// Asegúrate de que STRIPE_SECRET_KEY esté en tus variables de entorno (.env.local para desarrollo)
+// Lee las variables de entorno una sola vez.
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+let stripe: Stripe | null = null;
+let stripeError: string | null = null;
 
 if (!stripeSecretKey) {
-  console.error('StripeActions FATAL ERROR: STRIPE_SECRET_KEY no está definida en las variables de entorno del servidor.');
+  stripeError = 'Error de configuración del servidor: La variable de entorno STRIPE_SECRET_KEY no está definida. Por favor, configúrala en Vercel.';
+  console.error(stripeError);
+} else {
+  stripe = new Stripe(stripeSecretKey, {
+    apiVersion: '2024-06-20',
+    typescript: true,
+  });
 }
 
-const stripe = new Stripe(stripeSecretKey!, {
-  apiVersion: '2024-06-20', // Usa la última versión de la API
-});
+if (!appUrl) {
+    // Este error se añade al principal si ambos faltan.
+    const urlError = 'Error de configuración del servidor: La variable de entorno NEXT_PUBLIC_APP_URL no está definida. Por favor, configúrala en Vercel.';
+    console.error(urlError);
+    stripeError = stripeError ? `${stripeError} ${urlError}` : urlError;
+}
+
 
 interface CreateCheckoutSessionResponse {
   sessionId?: string;
@@ -23,18 +36,10 @@ interface CreateCheckoutSessionResponse {
 export async function createCheckoutSession(): Promise<CreateCheckoutSessionResponse> {
   console.log('StripeActions: Iniciando createCheckoutSession...');
 
-  if (!stripeSecretKey) {
-    // Este log ya está arriba, pero es bueno tenerlo aquí también por si acaso.
-    console.error('StripeActions Error: STRIPE_SECRET_KEY no está configurada. No se puede inicializar Stripe.');
-    return { error: 'Error de configuración del servidor: Clave secreta de Stripe no encontrada.' };
-  }
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  console.log(`StripeActions: NEXT_PUBLIC_APP_URL leída del entorno: ${appUrl}`);
-
-  if (!appUrl) {
-    console.error('StripeActions Error: NEXT_PUBLIC_APP_URL no está configurada en las variables de entorno del servidor.');
-    return { error: 'Error de configuración del servidor: La URL de la aplicación no está configurada.' };
+  // Si hubo un error en la inicialización, no continuar.
+  if (stripeError || !stripe) {
+    console.error('StripeActions Error: Stripe no está inicializado o faltan variables de entorno.');
+    return { error: stripeError || 'Stripe no está inicializado.' };
   }
 
   try {
@@ -44,12 +49,12 @@ export async function createCheckoutSession(): Promise<CreateCheckoutSessionResp
       line_items: [
         {
           price_data: {
-            currency: 'eur', // Cambia a tu moneda si es necesario
+            currency: 'eur',
             product_data: {
               name: 'Portada de Canción Personalizada - SpotOn Cover',
               description: 'Descarga de tu portada de canción personalizada estilo Spotify.',
             },
-            unit_amount: 99, // Precio en céntimos (0.99€)
+            unit_amount: 99, // 0.99€
           },
           quantity: 1,
         },
