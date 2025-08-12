@@ -12,7 +12,7 @@ import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { generateAlbumCoverAction } from '@/lib/actions';
-import { Loader2, Sparkles, CreditCard, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, Download, Trash2 } from 'lucide-react'; // Changed icon
 import React from 'react';
 
 interface CoverFormProps {
@@ -132,14 +132,14 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
     }
   };
 
-  const onSubmitTriggerPaymentDialog = () => { 
+  const onDirectDownload = () => { 
     onDownload();
   };
 
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmitTriggerPaymentDialog)} className="space-y-6 p-4 md:p-6 rounded-lg shadow-lg bg-card w-full max-w-md">
+        <form onSubmit={form.handleSubmit(onDirectDownload)} className="space-y-6 p-4 md:p-6 rounded-lg shadow-lg bg-card w-full max-w-md">
           <FormField
             control={form.control}
             name="songTitle"
@@ -250,8 +250,8 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
               <Trash2 className="mr-2 h-4 w-4" /> Reiniciar
             </Button>
             <Button type="submit" className="w-full flex-grow bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isProcessingPayment}>
-              {isProcessingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" /> }
-              Pagar 0,99€ y Descargar
+              {isProcessingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" /> }
+              Descargar Portada
             </Button>
           </div>
         </form>
@@ -259,3 +259,5 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
     </>
   );
 }
+
+    

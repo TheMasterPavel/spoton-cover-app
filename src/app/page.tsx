@@ -109,11 +109,17 @@ function HomePageContent() {
   // This happens after the state is restored and the component has re-rendered.
   useEffect(() => {
     if (isReadyToDownload) {
-      captureAndDownloadCover();
-      // Reset the trigger
-      setIsReadyToDownload(false);
+      // Use a small timeout to ensure the DOM has updated with the restored state
+      const timer = setTimeout(() => {
+        captureAndDownloadCover();
+        // Reset the trigger
+        setIsReadyToDownload(false);
+      }, 100); // 100ms delay as a safeguard
+
+      return () => clearTimeout(timer);
     }
   }, [isReadyToDownload, captureAndDownloadCover]);
+
 
   const handleStripeCheckout = useCallback(async () => {
     setIsProcessingPayment(true);
@@ -194,6 +200,7 @@ function HomePageContent() {
         }
       } else {
          toast({ title: 'Aviso', description: 'No se encontró un diseño guardado. Descargando la portada actual.'});
+         // Directly call download if no state is found.
          captureAndDownloadCover();
          if (currentPath) router.replace(currentPath, { scroll: false });
       }
@@ -224,7 +231,8 @@ function HomePageContent() {
     } else if (paymentCanceled === 'true') {
       handleCancel();
     }
-  }, [searchParams, router, toast, captureAndDownloadCover]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, router, toast]);
 
 
   const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => {
@@ -312,11 +320,12 @@ function HomePageContent() {
         <CoverForm
           initialValues={previewState}
           onFormChange={handleFormChange}
-          onDownload={() => setIsPaymentDialogOpen(true)}
+          onDownload={captureAndDownloadCover} // Directly call the download function
           isProcessingPayment={isProcessingPayment}
         />
       </main>
 
+      {/* Payment Dialog is kept in the code but will not be triggered in this test mode */}
       <AlertDialog open={isPaymentDialogOpen} onOpenChange={(open) => {
         if (!isProcessingPayment) {
           setIsPaymentDialogOpen(open);
@@ -353,3 +362,5 @@ export default function HomePage() {
     </Suspense>
   );
 }
+
+    
