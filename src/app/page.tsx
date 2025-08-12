@@ -1,5 +1,6 @@
 
 'use client';
+import type { ChangeEvent } from 'react';
 import React, { Suspense } from 'react';
 import { StripePaymentHandler } from '@/components/StripePaymentHandler';
 import { CoverForm } from '@/components/CoverForm';
@@ -22,7 +23,7 @@ function HomePageContent() {
   const [previewState, setPreviewState] = React.useState({
     ...initialFormValues,
     isPlaying: false,
-    themeMode: 'dark',
+    themeMode: 'dark' as 'dark' | 'light', // Corrected type
   });
   const coverPreviewRef = React.useRef<HTMLDivElement>(null);
 
@@ -75,8 +76,8 @@ function HomePageContent() {
 
   return (
     <StripePaymentHandler 
-      previewState={previewState} 
-      setPreviewState={setPreviewState} 
+      previewState={previewState}
+      setPreviewState={setPreviewState}
       coverPreviewRef={coverPreviewRef}
     >
       {({ onDownload, isProcessingPayment }) => (
