@@ -23,7 +23,7 @@ function HomePageContent() {
   const [previewState, setPreviewState] = React.useState({
     ...initialFormValues,
     isPlaying: false,
-    themeMode: 'dark' as 'dark' | 'light', // Corrected type
+    themeMode: 'dark' as 'dark' | 'light',
   });
   const coverPreviewRef = React.useRef<HTMLDivElement>(null);
 
