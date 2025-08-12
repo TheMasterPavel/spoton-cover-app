@@ -62,6 +62,9 @@ function HomePageContent() {
 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  
+  // State to trigger download after successful payment and state restoration
+  const [isReadyToDownload, setIsReadyToDownload] = useState(false);
 
   const captureAndDownloadCover = useCallback(async () => {
     const elementToCapture = coverPreviewRef.current;
@@ -102,6 +105,16 @@ function HomePageContent() {
     }
   }, [coverPreviewRef, toast]);
   
+  // This useEffect triggers the download ONLY when isReadyToDownload is true.
+  // This happens after the state is restored and the component has re-rendered.
+  useEffect(() => {
+    if (isReadyToDownload) {
+      captureAndDownloadCover();
+      // Reset the trigger
+      setIsReadyToDownload(false);
+    }
+  }, [isReadyToDownload, captureAndDownloadCover]);
+
   const handleStripeCheckout = useCallback(async () => {
     setIsProcessingPayment(true);
 
@@ -170,17 +183,17 @@ function HomePageContent() {
         try {
           const savedState = JSON.parse(savedStateString);
           setPreviewState(savedState);
-          setTimeout(() => {
-            captureAndDownloadCover();
-            localStorage.removeItem('spotOnCoverPreviewState');
-            if (currentPath) router.replace(currentPath, { scroll: false });
-          }, 1000);
+          // Set the trigger to true. The download will happen in the other useEffect.
+          setIsReadyToDownload(true);
         } catch (e) {
-            captureAndDownloadCover();
-            localStorage.removeItem('spotOnCoverPreviewState');
-            if (currentPath) router.replace(currentPath, { scroll: false });
+          console.error("Failed to parse saved state from localStorage", e);
+          toast({ title: 'Error', description: 'No se pudo restaurar tu diseño.', variant: 'destructive'});
+        } finally {
+          localStorage.removeItem('spotOnCoverPreviewState');
+          if (currentPath) router.replace(currentPath, { scroll: false });
         }
       } else {
+         toast({ title: 'Aviso', description: 'No se encontró un diseño guardado. Descargando la portada actual.'});
          captureAndDownloadCover();
          if (currentPath) router.replace(currentPath, { scroll: false });
       }
@@ -192,13 +205,14 @@ function HomePageContent() {
         description: 'Has cancelado el proceso de pago.',
         variant: 'destructive',
       });
+      // Also restore state on cancel so the user doesn't lose their work
       const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
       if (savedStateString) {
         try {
           const savedState = JSON.parse(savedStateString);
           setPreviewState(savedState);
         } catch (e) {
-            // Do nothing
+          // Do nothing if parsing fails
         }
       }
       localStorage.removeItem('spotOnCoverPreviewState');
