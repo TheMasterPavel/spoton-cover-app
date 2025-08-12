@@ -126,6 +126,10 @@ function HomePageContent() {
   );
 }
 
+// This is the main export for the page.
+// We wrap the main content in a <Suspense> component.
+// This tells Next.js to show a fallback UI while the client-side parts (like StripePaymentHandler) are loading.
+// This is the key fix for the deployment error.
 export default function HomePage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Cargando...</div>}>
