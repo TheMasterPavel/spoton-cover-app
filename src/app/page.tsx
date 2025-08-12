@@ -22,11 +22,9 @@ function HomePageContent() {
   const [previewState, setPreviewState] = React.useState({
     ...initialFormValues,
     isPlaying: false,
+    themeMode: 'dark',
   });
   const coverPreviewRef = React.useRef<HTMLDivElement>(null);
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
-  const [themeMode, setThemeMode] = React.useState<'dark' | 'light'>('dark');
-  const [isProcessingPayment, setIsProcessingPayment] = React.useState(false);
 
   const handleFormChange = React.useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => {
     setPreviewState(currentPreviewState => {
@@ -56,9 +54,9 @@ function HomePageContent() {
       if (newValues.hasOwnProperty('coverImageFile')) {
         updatedState.coverImageFile = newValues.coverImageFile;
         updatedState.coverImageUrl = newValues.coverImageUrl ?? currentPreviewState.coverImageUrl;
-      } else if (newValues.hasOwnProperty('coverImageUrl')) { // Only for AI generation or explicit URL change
+      } else if (newValues.hasOwnProperty('coverImageUrl')) { 
         updatedState.coverImageUrl = newValues.coverImageUrl;
-        if (newValues.coverImageUrl !== currentPreviewState.coverImageUrl) { // if AI sets new image, clear file
+        if (newValues.coverImageUrl !== currentPreviewState.coverImageUrl) {
             updatedState.coverImageFile = undefined;
         }
       }
@@ -70,22 +68,20 @@ function HomePageContent() {
   const handlePlayPauseToggle = React.useCallback(() => {
     setPreviewState(prevState => ({ ...prevState, isPlaying: !prevState.isPlaying }));
   }, []);
+  
+  const handleThemeChange = (theme: 'dark' | 'light') => {
+      setPreviewState(prevState => ({ ...prevState, themeMode: theme }));
+  };
 
   return (
-    <>
-      <Suspense fallback={<div>Cargando...</div>}>
-        <StripePaymentHandler
-          previewState={previewState}
-          setPreviewState={setPreviewState}
-          coverPreviewRef={coverPreviewRef}
-          isProcessingPayment={isProcessingPayment}
-          setIsProcessingPayment={setIsProcessingPayment}
-          isPaymentDialogOpen={isPaymentDialogOpen}
-          setIsPaymentDialogOpen={setIsPaymentDialogOpen}
-        />
-      </Suspense>
-      <main className="flex flex-col items-center justify-start py-10 px-4 space-y-8 min-h-screen">
-        <div className="w-full max-w-sm">
+    <StripePaymentHandler 
+      previewState={previewState} 
+      setPreviewState={setPreviewState} 
+      coverPreviewRef={coverPreviewRef}
+    >
+      {({ onDownload, isProcessingPayment }) => (
+        <main className="flex flex-col items-center justify-start py-10 px-4 space-y-8 min-h-screen">
+          <div className="w-full max-w-sm">
             <CoverPreview
               ref={coverPreviewRef}
               songTitle={previewState.songTitle}
@@ -95,42 +91,43 @@ function HomePageContent() {
               progressPercentage={previewState.progressPercentage}
               isPlaying={previewState.isPlaying}
               onPlayPauseToggle={handlePlayPauseToggle}
-              themeMode={themeMode}
+              themeMode={previewState.themeMode}
             />
             <div className="flex gap-2 mt-4 mb-6 justify-center">
-                <Button 
-                    onClick={() => setThemeMode('light')} 
-                    disabled={themeMode === 'light' || isProcessingPayment}
-                    variant={themeMode === 'light' ? "default" : "outline"}
-                >
-                    Elementos Negros
-                </Button>
-                <Button 
-                    onClick={() => setThemeMode('dark')} 
-                    disabled={themeMode === 'dark' || isProcessingPayment}
-                    variant={themeMode === 'dark' ? "default" : "outline"}
-                >
-                    Elementos Blancos
-                </Button>
+              <Button 
+                onClick={() => handleThemeChange('light')} 
+                disabled={previewState.themeMode === 'light' || isProcessingPayment}
+                variant={previewState.themeMode === 'light' ? "default" : "outline"}
+              >
+                Elementos Negros
+              </Button>
+              <Button 
+                onClick={() => handleThemeChange('dark')} 
+                disabled={previewState.themeMode === 'dark' || isProcessingPayment}
+                variant={previewState.themeMode === 'dark' ? "default" : "outline"}
+              >
+                Elementos Blancos
+              </Button>
             </div>
-        </div>
+          </div>
 
-        <Separator className="w-full max-w-md" />
-        
-        <CoverForm
-          initialValues={previewState}
-          onFormChange={handleFormChange}
-          onDownload={() => setIsPaymentDialogOpen(true)}
-          isProcessingPayment={isProcessingPayment}
-        />
-      </main>
-    </>
+          <Separator className="w-full max-w-md" />
+          
+          <CoverForm
+            initialValues={previewState}
+            onFormChange={handleFormChange}
+            onDownload={onDownload}
+            isProcessingPayment={isProcessingPayment}
+          />
+        </main>
+      )}
+    </StripePaymentHandler>
   );
 }
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<div>Cargando...</div>}>
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Cargando...</div>}>
       <HomePageContent />
     </Suspense>
   );

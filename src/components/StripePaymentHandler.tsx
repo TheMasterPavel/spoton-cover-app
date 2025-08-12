@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
@@ -20,13 +20,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface StripePaymentHandlerProps {
-  previewState: CoverFormValues & { coverImageUrl?: string | null, isPlaying: boolean };
+  children: (props: { onDownload: () => void, isProcessingPayment: boolean }) => React.ReactNode;
+  previewState: CoverFormValues & { coverImageUrl?: string | null, isPlaying: boolean, themeMode: 'dark' | 'light' };
   setPreviewState: React.Dispatch<React.SetStateAction<any>>;
   coverPreviewRef: React.RefObject<HTMLDivElement>;
-  isProcessingPayment: boolean;
-  setIsProcessingPayment: React.Dispatch<React.SetStateAction<boolean>>;
-  isPaymentDialogOpen: boolean;
-  setIsPaymentDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 let stripePromise: Promise<Stripe | null> | null = null;
@@ -43,17 +40,17 @@ const getStripe = () => {
 };
 
 export function StripePaymentHandler({
+  children,
   previewState,
   setPreviewState,
   coverPreviewRef,
-  isProcessingPayment,
-  setIsProcessingPayment,
-  isPaymentDialogOpen,
-  setIsPaymentDialogOpen,
 }: StripePaymentHandlerProps) {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
 
   const captureAndDownloadCover = useCallback(async () => {
     const elementToCapture = coverPreviewRef.current;
@@ -137,7 +134,7 @@ export function StripePaymentHandler({
       const { error } = await stripe.redirectToCheckout({ sessionId });
       if (error) throw error;
     } catch (error: any) {
-      toast({
+       toast({
         title: 'Error de Redirección',
         description: 'No se pudo redirigir a la página de pago.',
         variant: 'destructive',
@@ -145,14 +142,14 @@ export function StripePaymentHandler({
       localStorage.removeItem('spotOnCoverPreviewState');
       setIsProcessingPayment(false);
     }
-  }, [previewState, setIsProcessingPayment, toast]);
+  }, [previewState, toast]);
 
   useEffect(() => {
     const paymentSuccess = searchParams.get('payment_success');
     const paymentCanceled = searchParams.get('payment_canceled');
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
 
-    if (paymentSuccess === 'true') {
+    const handleSuccess = () => {
       toast({
         title: '¡Pago Exitoso!',
         description: 'Tu descarga comenzará en breve.',
@@ -176,7 +173,9 @@ export function StripePaymentHandler({
          captureAndDownloadCover();
          if (currentPath) router.replace(currentPath, { scroll: false });
       }
-    } else if (paymentCanceled === 'true') {
+    };
+
+    const handleCancel = () => {
       toast({
         title: 'Pago Cancelado',
         description: 'Has cancelado el proceso de pago.',
@@ -193,34 +192,42 @@ export function StripePaymentHandler({
       }
       localStorage.removeItem('spotOnCoverPreviewState');
       if (currentPath) router.replace(currentPath, { scroll: false });
+    };
+
+    if (paymentSuccess === 'true') {
+      handleSuccess();
+    } else if (paymentCanceled === 'true') {
+      handleCancel();
     }
   }, [searchParams, router, toast, captureAndDownloadCover, setPreviewState]);
 
+  const onDownload = () => setIsPaymentDialogOpen(true);
+
   return (
-    <AlertDialog open={isPaymentDialogOpen} onOpenChange={(open) => {
-      if (!isProcessingPayment) {
+    <>
+      {children({ onDownload, isProcessingPayment })}
+      <AlertDialog open={isPaymentDialogOpen} onOpenChange={(open) => {
+        if (!isProcessingPayment) {
           setIsPaymentDialogOpen(open);
-      }
-    }}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Confirmar pago y descargar</AlertDialogTitle>
-          <AlertDialogDescription>
-            Para continuar con la descarga de tu portada personalizada (0,99€), serás redirigido a Stripe para completar el pago de forma segura.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isProcessingPayment} onClick={() => {
-              setIsPaymentDialogOpen(false);
-              if (isProcessingPayment) setIsProcessingPayment(false); 
-          }}>
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar pago y descargar</AlertDialogTitle>
+            <AlertDialogDescription>
+              Para continuar con la descarga de tu portada personalizada (0,99€), serás redirigido a Stripe para completar el pago de forma segura.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessingPayment} onClick={() => setIsPaymentDialogOpen(false)}>
               Cancelar
-          </AlertDialogCancel>
-          <AlertDialogAction onClick={handleStripeCheckout} disabled={isProcessingPayment}>
-            {isProcessingPayment ? 'Procesando...' : 'Pagar 0,99€ y Continuar'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleStripeCheckout} disabled={isProcessingPayment}>
+              {isProcessingPayment ? 'Procesando...' : 'Pagar 0,99€ y Continuar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
