@@ -19,12 +19,8 @@ const nextConfig = {
   experimental: {
     allowedDevOrigins: [
       "https://3000-firebase-studio-1747900301578.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
-      "https://6000-firebase-studio-1747900301578.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev", // Añadida la URL del error
+      "https://6000-firebase-studio-1747900301578.cluster-6vyo4gb53jczovun3dxslzjahs.cloudworkstations.dev",
     ],
-    // WARNING: This is a temporary workaround for the persistent deployment issue.
-    // This disables the rule that requires Suspense boundaries for hooks like useSearchParams.
-    // It might affect performance by causing the page to be client-side rendered.
-    missingSuspenseWithCSRBailout: false,
   },
 };
 

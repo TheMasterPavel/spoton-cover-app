@@ -47,7 +47,7 @@ const getStripe = () => {
   return stripePromise;
 };
 
-// This is the actual page content that depends on client-side hooks
+// Este es el contenido real de la página que depende de los hooks del lado del cliente.
 function HomePageContent() {
   const [previewState, setPreviewState] = useState({
     ...initialFormValues,
@@ -63,7 +63,7 @@ function HomePageContent() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   
-  // State to trigger download after successful payment and state restoration
+  // Estado para activar la descarga después de un pago exitoso y la restauración del estado.
   const [isReadyToDownload, setIsReadyToDownload] = useState(false);
 
   const captureAndDownloadCover = useCallback(async () => {
@@ -105,16 +105,16 @@ function HomePageContent() {
     }
   }, [coverPreviewRef, toast]);
   
-  // This useEffect triggers the download ONLY when isReadyToDownload is true.
-  // This happens after the state is restored and the component has re-rendered.
+  // Este useEffect activa la descarga SÓLO cuando isReadyToDownload es true.
+  // Esto ocurre después de que el estado se restaura y el componente se ha vuelto a renderizar.
   useEffect(() => {
     if (isReadyToDownload) {
-      // Use a small timeout to ensure the DOM has updated with the restored state
+      // Usar un pequeño tiempo de espera para asegurar que el DOM se ha actualizado con el estado restaurado.
       const timer = setTimeout(() => {
         captureAndDownloadCover();
-        // Reset the trigger
+        // Restablecer el activador.
         setIsReadyToDownload(false);
-      }, 100); // 100ms delay as a safeguard
+      }, 100); // Retraso de 100ms como salvaguarda.
 
       return () => clearTimeout(timer);
     }
@@ -189,10 +189,10 @@ function HomePageContent() {
         try {
           const savedState = JSON.parse(savedStateString);
           setPreviewState(savedState);
-          // Set the trigger to true. The download will happen in the other useEffect.
+          // Establecer el activador a true. La descarga ocurrirá en el otro useEffect.
           setIsReadyToDownload(true);
         } catch (e) {
-          console.error("Failed to parse saved state from localStorage", e);
+          console.error("Fallo al parsear el estado guardado desde localStorage", e);
           toast({ title: 'Error', description: 'No se pudo restaurar tu diseño.', variant: 'destructive'});
         } finally {
           localStorage.removeItem('spotOnCoverPreviewState');
@@ -200,7 +200,7 @@ function HomePageContent() {
         }
       } else {
          toast({ title: 'Aviso', description: 'No se encontró un diseño guardado. Descargando la portada actual.'});
-         // Directly call download if no state is found.
+         // Llamar directamente a la descarga si no se encuentra ningún estado.
          captureAndDownloadCover();
          if (currentPath) router.replace(currentPath, { scroll: false });
       }
@@ -212,14 +212,14 @@ function HomePageContent() {
         description: 'Has cancelado el proceso de pago.',
         variant: 'destructive',
       });
-      // Also restore state on cancel so the user doesn't lose their work
+      // También restaurar el estado en la cancelación para que el usuario no pierda su trabajo.
       const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
       if (savedStateString) {
         try {
           const savedState = JSON.parse(savedStateString);
           setPreviewState(savedState);
         } catch (e) {
-          // Do nothing if parsing fails
+          // No hacer nada si el parseo falla.
         }
       }
       localStorage.removeItem('spotOnCoverPreviewState');
@@ -233,6 +233,12 @@ function HomePageContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router, toast]);
+
+  // Modo de prueba de descarga sin pago
+  const onDirectDownload = () => {
+    // setIsPaymentDialogOpen(true); // Descomentar para el flujo de pago real
+    captureAndDownloadCover(); // Activar para pruebas directas
+  };
 
 
   const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => {
@@ -320,12 +326,12 @@ function HomePageContent() {
         <CoverForm
           initialValues={previewState}
           onFormChange={handleFormChange}
-          onDownload={captureAndDownloadCover} // Directly call the download function
+          onDownload={onDirectDownload} // Cambiado a descarga directa
           isProcessingPayment={isProcessingPayment}
         />
       </main>
 
-      {/* Payment Dialog is kept in the code but will not be triggered in this test mode */}
+      {/* El diálogo de pago se mantiene en el código pero no se activará en el modo de prueba */}
       <AlertDialog open={isPaymentDialogOpen} onOpenChange={(open) => {
         if (!isProcessingPayment) {
           setIsPaymentDialogOpen(open);
@@ -352,9 +358,9 @@ function HomePageContent() {
   );
 }
 
-// This is the main export for the page.
-// We wrap the main content in a <Suspense> component.
-// This tells Next.js to show a fallback UI while the client-side parts are loading.
+// Esta es la exportación principal de la página.
+// Envolvemos el contenido principal en un componente <Suspense>.
+// Esto le dice a Next.js que muestre una UI de respaldo mientras las partes del lado del cliente se están cargando.
 export default function HomePage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Cargando...</div>}>
@@ -362,5 +368,3 @@ export default function HomePage() {
     </Suspense>
   );
 }
-
-    

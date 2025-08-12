@@ -12,7 +12,7 @@ import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { generateAlbumCoverAction } from '@/lib/actions';
-import { Loader2, Sparkles, Download, Trash2 } from 'lucide-react'; // Changed icon
+import { Loader2, Sparkles, Download, Trash2 } from 'lucide-react';
 import React from 'react';
 
 interface CoverFormProps {
@@ -104,7 +104,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
         variant: 'destructive',
         duration: 5000,
       });
-      if (!getValues('coverImageFile') && initialValues.coverImageUrl) { // Check initialValues.coverImageUrl
+      if (!getValues('coverImageFile') && initialValues.coverImageUrl) { // Comprobar initialValues.coverImageUrl
          onFormChange({ coverImageUrl: initialValues.coverImageUrl });
       }
     } finally {
@@ -116,7 +116,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
     reset({
       songTitle: initialValues.songTitle,
       artistName: initialValues.artistName,
-      coverImageFile: undefined, // Always reset file input visually
+      coverImageFile: undefined, // Siempre resetear el input de archivo visualmente
       durationMinutes: initialValues.durationMinutes,
       durationSeconds: initialValues.durationSeconds,
       progressPercentage: initialValues.progressPercentage,
@@ -234,7 +234,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
                     onValueChange={(vals) => onSliderChange(vals[0])}
                     max={100}
                     step={1}
-                    themeMode={watch('songTitle') ? 'dark' : 'light'} // This themeMode might be different from page's themeMode
+                    themeMode={watch('songTitle') ? 'dark' : 'light'} // Este themeMode podría ser diferente al de la página.
                     className="[&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green"
                     aria-label="Porcentaje de progreso de la canción"
                     {...restField}
@@ -259,5 +259,3 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
     </>
   );
 }
-
-    
