@@ -63,7 +63,7 @@ function HomePageContent() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   
-  // Estado para activar la descarga después de un pago exitoso y la restauración del estado.
+  // Trigger para la descarga post-pago
   const [isReadyToDownload, setIsReadyToDownload] = useState(false);
 
   const captureAndDownloadCover = useCallback(async () => {
@@ -78,6 +78,7 @@ function HomePageContent() {
     }
 
     try {
+      // Forzar un redespliegue de Vercel
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
@@ -105,16 +106,14 @@ function HomePageContent() {
     }
   }, [coverPreviewRef, toast]);
   
-  // Este useEffect activa la descarga SÓLO cuando isReadyToDownload es true.
-  // Esto ocurre después de que el estado se restaura y el componente se ha vuelto a renderizar.
+  // useEffect para activar la descarga DESPUÉS de que el estado se haya restaurado y renderizado
   useEffect(() => {
     if (isReadyToDownload) {
-      // Usar un pequeño tiempo de espera para asegurar que el DOM se ha actualizado con el estado restaurado.
+      // Pequeño delay para asegurar que el DOM está 100% actualizado con el estado restaurado
       const timer = setTimeout(() => {
         captureAndDownloadCover();
-        // Restablecer el activador.
-        setIsReadyToDownload(false);
-      }, 100); // Retraso de 100ms como salvaguarda.
+        setIsReadyToDownload(false); // Resetear el trigger
+      }, 100); 
 
       return () => clearTimeout(timer);
     }
@@ -189,7 +188,7 @@ function HomePageContent() {
         try {
           const savedState = JSON.parse(savedStateString);
           setPreviewState(savedState);
-          // Establecer el activador a true. La descarga ocurrirá en el otro useEffect.
+          // Activar la descarga en el siguiente renderizado
           setIsReadyToDownload(true);
         } catch (e) {
           console.error("Fallo al parsear el estado guardado desde localStorage", e);
@@ -200,7 +199,6 @@ function HomePageContent() {
         }
       } else {
          toast({ title: 'Aviso', description: 'No se encontró un diseño guardado. Descargando la portada actual.'});
-         // Llamar directamente a la descarga si no se encuentra ningún estado.
          captureAndDownloadCover();
          if (currentPath) router.replace(currentPath, { scroll: false });
       }
@@ -212,15 +210,13 @@ function HomePageContent() {
         description: 'Has cancelado el proceso de pago.',
         variant: 'destructive',
       });
-      // También restaurar el estado en la cancelación para que el usuario no pierda su trabajo.
+      // Restaurar el estado en cancelación para no perder el trabajo
       const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
       if (savedStateString) {
         try {
           const savedState = JSON.parse(savedStateString);
           setPreviewState(savedState);
-        } catch (e) {
-          // No hacer nada si el parseo falla.
-        }
+        } catch (e) { /* No hacer nada si falla */ }
       }
       localStorage.removeItem('spotOnCoverPreviewState');
       if (currentPath) router.replace(currentPath, { scroll: false });
@@ -234,10 +230,11 @@ function HomePageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router, toast]);
 
-  // Modo de prueba de descarga sin pago
   const onDirectDownload = () => {
-    // setIsPaymentDialogOpen(true); // Descomentar para el flujo de pago real
-    captureAndDownloadCover(); // Activar para pruebas directas
+    // Para modo de prueba, se salta el diálogo de pago y descarga directamente.
+    captureAndDownloadCover(); 
+    // Para activar el pago, comenta la línea de arriba y descomenta la de abajo
+    // setIsPaymentDialogOpen(true);
   };
 
 
@@ -326,12 +323,11 @@ function HomePageContent() {
         <CoverForm
           initialValues={previewState}
           onFormChange={handleFormChange}
-          onDownload={onDirectDownload} // Cambiado a descarga directa
+          onDownload={onDirectDownload}
           isProcessingPayment={isProcessingPayment}
         />
       </main>
 
-      {/* El diálogo de pago se mantiene en el código pero no se activará en el modo de prueba */}
       <AlertDialog open={isPaymentDialogOpen} onOpenChange={(open) => {
         if (!isProcessingPayment) {
           setIsPaymentDialogOpen(open);
@@ -358,9 +354,7 @@ function HomePageContent() {
   );
 }
 
-// Esta es la exportación principal de la página.
-// Envolvemos el contenido principal en un componente <Suspense>.
-// Esto le dice a Next.js que muestre una UI de respaldo mientras las partes del lado del cliente se están cargando.
+// Envolvemos el contenido en <Suspense> para manejar correctamente los hooks de cliente como useSearchParams
 export default function HomePage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Cargando...</div>}>
@@ -368,3 +362,5 @@ export default function HomePage() {
     </Suspense>
   );
 }
+
+    
