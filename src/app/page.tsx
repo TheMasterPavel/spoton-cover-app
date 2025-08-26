@@ -5,14 +5,19 @@ import React, { Suspense, useEffect, useCallback, useState, useRef } from 'react
 import { useSearchParams, useRouter } from 'next/navigation';
 import html2canvas from 'html2canvas';
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import { useForm, FormProvider } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 import { CoverForm } from '@/components/CoverForm';
 import { CoverPreview } from '@/components/CoverPreview';
-import type { CoverFormValues } from '@/lib/schema';
+import type { CoverFormValues, ShippingFormValues, EmailFormValues } from '@/lib/schema';
+import { ShippingFormSchema, EmailFormSchema } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { createCheckoutSession } from '@/lib/stripeActions';
+import { createCheckoutSession, createShippingCheckoutSession } from '@/lib/stripeActions';
+import { saveEmailAction } from '@/lib/actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +28,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Loader2 } from 'lucide-react';
+
 
 const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
   songTitle: 'Melodía Increíble',
@@ -60,14 +84,16 @@ function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [isShippingDialogOpen, setIsShippingDialogOpen] = useState(false);
+  const [isUpsellDialogOpen, setIsUpsellDialogOpen] = useState(false);
+
   // Trigger para la descarga post-pago
   const [isReadyToDownload, setIsReadyToDownload] = useState(false);
 
   const captureAndDownloadCover = useCallback(async () => {
-    // Apuntamos al elemento de contenido interno, que tiene el fondo transparente
     const elementToCapture = coverContentRef.current;
     if (!elementToCapture) {
       toast({
@@ -82,7 +108,7 @@ function HomePageContent() {
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null, // Mantenemos esto para asegurar la transparencia
+        backgroundColor: null,
         scale: 2,
       });
       const imageUrl = canvas.toDataURL('image/png');
@@ -96,6 +122,9 @@ function HomePageContent() {
         title: 'Descarga Iniciada',
         description: 'Tu portada personalizada se está descargando.',
       });
+      // After successful download, show the upsell dialog
+      setTimeout(() => setIsUpsellDialogOpen(true), 500);
+
     } catch (error) {
       console.error('Error en html2canvas:', error);
       toast({
@@ -106,13 +135,11 @@ function HomePageContent() {
     }
   }, [coverContentRef, toast]);
   
-  // useEffect para activar la descarga DESPUÉS de que el estado se haya restaurado y renderizado
   useEffect(() => {
     if (isReadyToDownload) {
-      // Pequeño delay para asegurar que el DOM está 100% actualizado con el estado restaurado
       const timer = setTimeout(() => {
         captureAndDownloadCover();
-        setIsReadyToDownload(false); // Resetear el trigger
+        setIsReadyToDownload(false);
       }, 100); 
 
       return () => clearTimeout(timer);
@@ -120,9 +147,8 @@ function HomePageContent() {
   }, [isReadyToDownload, captureAndDownloadCover]);
 
 
-  const handleStripeCheckout = useCallback(async () => {
-    setIsPaymentDialogOpen(false); // Close dialog immediately
-    setIsProcessingPayment(true);
+  const handleStripeCheckout = useCallback(async (shippingDetails: ShippingFormValues) => {
+    setIsProcessing(true);
 
     try {
       localStorage.setItem('spotOnCoverPreviewState', JSON.stringify(previewState));
@@ -132,11 +158,11 @@ function HomePageContent() {
         description: "No se pudo guardar el estado de tu portada.",
         variant: "destructive",
       });
-      setIsProcessingPayment(false);
+      setIsProcessing(false);
       return;
     }
 
-    const { sessionId, error: sessionError } = await createCheckoutSession();
+    const { sessionId, error: sessionError } = await createShippingCheckoutSession(shippingDetails);
     if (sessionError || !sessionId) {
       toast({
         title: 'Error al Iniciar Pago',
@@ -144,7 +170,7 @@ function HomePageContent() {
         variant: 'destructive',
       });
       localStorage.removeItem('spotOnCoverPreviewState');
-      setIsProcessingPayment(false);
+      setIsProcessing(false);
       return;
     }
 
@@ -156,7 +182,7 @@ function HomePageContent() {
         variant: 'destructive',
       });
       localStorage.removeItem('spotOnCoverPreviewState');
-      setIsProcessingPayment(false);
+      setIsProcessing(false);
       return;
     }
 
@@ -170,7 +196,7 @@ function HomePageContent() {
         variant: 'destructive',
       });
       localStorage.removeItem('spotOnCoverPreviewState');
-      setIsProcessingPayment(false);
+      setIsProcessing(false);
     }
   }, [previewState, toast]);
 
@@ -182,27 +208,11 @@ function HomePageContent() {
     const handleSuccess = () => {
       toast({
         title: '¡Pago Exitoso!',
-        description: 'Tu descarga comenzará en breve.',
+        description: 'Gracias por tu compra. Tu funda está en camino.',
       });
-      const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
-      if (savedStateString) {
-        try {
-          const savedState = JSON.parse(savedStateString);
-          setPreviewState(savedState);
-          // Activar la descarga en el siguiente renderizado
-          setIsReadyToDownload(true);
-        } catch (e) {
-          console.error("Fallo al parsear el estado guardado desde localStorage", e);
-          toast({ title: 'Error', description: 'No se pudo restaurar tu diseño.', variant: 'destructive'});
-        } finally {
-          localStorage.removeItem('spotOnCoverPreviewState');
-          if (currentPath) router.replace(currentPath, { scroll: false });
-        }
-      } else {
-         toast({ title: 'Aviso', description: 'No se encontró un diseño guardado. Descargando la portada actual.'});
-         captureAndDownloadCover();
-         if (currentPath) router.replace(currentPath, { scroll: false });
-      }
+      // Clear local storage but don't trigger a download for the case
+      localStorage.removeItem('spotOnCoverPreviewState');
+      if (currentPath) router.replace(currentPath, { scroll: false });
     };
 
     const handleCancel = () => {
@@ -211,7 +221,6 @@ function HomePageContent() {
         description: 'Has cancelado el proceso de pago.',
         variant: 'destructive',
       });
-      // Restaurar el estado en cancelación para no perder el trabajo
       const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
       if (savedStateString) {
         try {
@@ -278,18 +287,41 @@ function HomePageContent() {
       setPreviewState(prevState => ({ ...prevState, themeMode: theme }));
   };
 
-  const handleDirectDownload = () => {
-    // Llama directamente a la función de descarga en lugar de abrir el diálogo
-    captureAndDownloadCover();
+  const onEmailSubmit = async (data: EmailFormValues) => {
+      setIsProcessing(true);
+      try {
+        await saveEmailAction(data);
+        toast({
+            title: "¡Email Guardado!",
+            description: "Gracias. Tu descarga comenzará ahora.",
+        });
+        setIsEmailDialogOpen(false);
+        captureAndDownloadCover();
+      } catch (error) {
+        toast({
+            title: "Error",
+            description: "No se pudo guardar el email. Inténtalo de nuevo.",
+            variant: "destructive",
+        });
+      } finally {
+        setIsProcessing(false);
+      }
   };
 
+  const onShippingSubmit = async (data: ShippingFormValues) => {
+      setIsShippingDialogOpen(false); // Close this dialog
+      await handleStripeCheckout(data);
+  };
+  
+  const emailForm = useForm<EmailFormValues>({ resolver: zodResolver(EmailFormSchema) });
+  const shippingForm = useForm<ShippingFormValues>({ resolver: zodResolver(ShippingFormSchema) });
 
   return (
     <>
       <main className="flex flex-col items-center justify-start py-10 px-4 space-y-8 min-h-screen">
         <div className="w-full max-w-sm">
           <CoverPreview
-            ref={coverContentRef} // Apuntamos a la nueva ref del contenido
+            ref={coverContentRef}
             songTitle={previewState.songTitle}
             artistName={previewState.artistName}
             imageUrl={previewState.coverImageUrl}
@@ -302,14 +334,14 @@ function HomePageContent() {
           <div className="flex gap-2 mt-4 mb-6 justify-center">
             <Button 
               onClick={() => handleThemeChange('light')} 
-              disabled={previewState.themeMode === 'light' || isProcessingPayment}
+              disabled={previewState.themeMode === 'light' || isProcessing}
               variant={previewState.themeMode === 'light' ? "default" : "outline"}
             >
               Elementos Negros
             </Button>
             <Button 
               onClick={() => handleThemeChange('dark')} 
-              disabled={previewState.themeMode === 'dark' || isProcessingPayment}
+              disabled={previewState.themeMode === 'dark' || isProcessing}
               variant={previewState.themeMode === 'dark' ? "default" : "outline"}
             >
               Elementos Blancos
@@ -322,30 +354,121 @@ function HomePageContent() {
         <CoverForm
           initialValues={previewState}
           onFormChange={handleFormChange}
-          onDownload={handleDirectDownload} // Cambiado a la descarga directa
-          isProcessingPayment={isProcessingPayment}
+          onDownloadRequest={() => setIsEmailDialogOpen(true)}
+          onOrderRequest={() => setIsShippingDialogOpen(true)}
+          isProcessing={isProcessing}
         />
       </main>
-
-      {/* El diálogo de pago sigue aquí por si quieres reactivarlo, pero no se abrirá con el botón principal */}
-      <AlertDialog open={isPaymentDialogOpen} onOpenChange={(open) => {
-        if (!isProcessingPayment) {
-          setIsPaymentDialogOpen(open);
-        }
-      }}>
+      
+      {/* Email Dialog */}
+      <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Descargar Imagen Gratis</DialogTitle>
+                <DialogDescription>
+                    Introduce tu email para descargar la imagen. Te prometemos no enviar spam.
+                </DialogDescription>
+            </DialogHeader>
+            <Form {...emailForm}>
+                <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
+                    <FormField
+                        control={emailForm.control}
+                        name="email"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="tu@email.com" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button type="button" variant="outline" disabled={isProcessing}>Cancelar</Button>
+                      </DialogClose>
+                        <Button type="submit" disabled={isProcessing}>
+                            {isProcessing ? <Loader2 className="animate-spin" /> : 'Descargar'}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Shipping Dialog */}
+      <Dialog open={isShippingDialogOpen} onOpenChange={setIsShippingDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+                <DialogTitle>Pedir Funda Personalizada</DialogTitle>
+                <DialogDescription>
+                    Rellena tus datos para recibir la funda con tu diseño. Serás redirigido para el pago seguro (9,99€).
+                </DialogDescription>
+            </DialogHeader>
+            <Form {...shippingForm}>
+                 <form onSubmit={shippingForm.handleSubmit(onShippingSubmit)} className="space-y-3 max-h-[60vh] overflow-y-auto pr-4">
+                    <div className="grid grid-cols-2 gap-3">
+                        <FormField control={shippingForm.control} name="firstName" render={({ field }) => (
+                            <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input placeholder="Tu nombre" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                         <FormField control={shippingForm.control} name="lastName" render={({ field }) => (
+                            <FormItem><FormLabel>Apellidos</FormLabel><FormControl><Input placeholder="Tus apellidos" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                    </div>
+                    <FormField control={shippingForm.control} name="address" render={({ field }) => (
+                        <FormItem><FormLabel>Dirección Completa</FormLabel><FormControl><Input placeholder="Calle, número, piso, puerta..." {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                     <div className="grid grid-cols-3 gap-3">
+                        <FormField control={shippingForm.control} name="city" render={({ field }) => (
+                            <FormItem><FormLabel>Ciudad</FormLabel><FormControl><Input placeholder="Ciudad" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={shippingForm.control} name="postalCode" render={({ field }) => (
+                            <FormItem><FormLabel>Cód. Postal</FormLabel><FormControl><Input placeholder="CP" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                         <FormField control={shippingForm.control} name="country" render={({ field }) => (
+                            <FormItem><FormLabel>País</FormLabel><FormControl><Input placeholder="País" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                    </div>
+                     <div className="grid grid-cols-2 gap-3">
+                        <FormField control={shippingForm.control} name="phone" render={({ field }) => (
+                            <FormItem><FormLabel>Teléfono</FormLabel><FormControl><Input placeholder="+34 600 000 000" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={shippingForm.control} name="phoneModel" render={({ field }) => (
+                           <FormItem><FormLabel>Modelo de Móvil</FormLabel><FormControl><Input placeholder="Ej: iPhone 15 Pro" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                    </div>
+                    <DialogFooter className="pt-4">
+                        <DialogClose asChild>
+                            <Button type="button" variant="outline" disabled={isProcessing}>Cancelar</Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={isProcessing}>
+                             {isProcessing ? <Loader2 className="animate-spin" /> : 'Pagar 9,99€ y Pedir'}
+                        </Button>
+                    </DialogFooter>
+                 </form>
+            </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Upsell Dialog */}
+      <AlertDialog open={isUpsellDialogOpen} onOpenChange={setIsUpsellDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar pago y descargar</AlertDialogTitle>
+            <AlertDialogTitle>¡Convierte tu Arte en una Funda!</AlertDialogTitle>
             <AlertDialogDescription>
-              Para continuar con la descarga de tu portada personalizada (0,99€), serás redirigido a Stripe para completar el pago de forma segura.
+              ¿Te encanta tu diseño? Recíbelo como una funda exclusiva para tu móvil por solo 9,99€.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isProcessingPayment} onClick={() => setIsPaymentDialogOpen(false)}>
-              Cancelar
+            <AlertDialogCancel onClick={() => setIsUpsellDialogOpen(false)}>
+              No, gracias
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleStripeCheckout} disabled={isProcessingPayment}>
-              {isProcessingPayment ? 'Procesando...' : 'Pagar 0,99€ y Continuar'}
+            <AlertDialogAction onClick={() => {
+                setIsUpsellDialogOpen(false);
+                setIsShippingDialogOpen(true);
+            }}>
+              ¡Sí, la quiero!
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -362,3 +485,5 @@ export default function HomePage() {
     </Suspense>
   );
 }
+
+    

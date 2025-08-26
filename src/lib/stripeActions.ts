@@ -2,6 +2,7 @@
 'use server';
 
 import Stripe from 'stripe';
+import type { ShippingFormValues } from '@/lib/schema';
 
 // Lee las variables de entorno una sola vez.
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -21,29 +22,25 @@ if (!stripeSecretKey) {
 }
 
 if (!appUrl) {
-    // Este error se añade al principal si ambos faltan.
     const urlError = 'Error de configuración del servidor: La variable de entorno NEXT_PUBLIC_APP_URL no está definida. Por favor, configúrala en Vercel.';
     console.error(urlError);
     stripeError = stripeError ? `${stripeError} ${urlError}` : urlError;
 }
-
 
 interface CreateCheckoutSessionResponse {
   sessionId?: string;
   error?: string;
 }
 
-export async function createCheckoutSession(): Promise<CreateCheckoutSessionResponse> {
-  console.log('StripeActions: Iniciando createCheckoutSession...');
-
-  // Si hubo un error en la inicialización, no continuar.
+export async function createShippingCheckoutSession(shippingDetails: ShippingFormValues): Promise<CreateCheckoutSessionResponse> {
+  console.log('StripeActions: Iniciando createShippingCheckoutSession...');
+  
   if (stripeError || !stripe) {
-    console.error('StripeActions Error: Stripe no está inicializado o faltan variables de entorno.');
+    console.error('StripeActions Error: Stripe no está inicializado.');
     return { error: stripeError || 'Stripe no está inicializado.' };
   }
 
   try {
-    console.log('StripeActions: Intentando crear sesión de Stripe Checkout...');
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -51,30 +48,50 @@ export async function createCheckoutSession(): Promise<CreateCheckoutSessionResp
           price_data: {
             currency: 'eur',
             product_data: {
-              name: 'Portada de Canción Personalizada - SpotOn Cover',
-              description: 'Descarga de tu portada de canción personalizada estilo Spotify.',
+              name: 'Funda de Móvil Personalizada - SpotOn Cover',
+              description: `Diseño para el modelo: ${shippingDetails.phoneModel}`,
+              images: [], // Podríamos pasar aquí una URL de la imagen generada si la guardásemos
             },
-            unit_amount: 99, // 0.99€
+            unit_amount: 999, // 9.99€
           },
           quantity: 1,
         },
       ],
       mode: 'payment',
+      shipping_address_collection: {
+        allowed_countries: ['ES', 'US', 'GB', 'DE', 'FR', 'IT', 'PT', 'MX'], // Ejemplo de países
+      },
+       custom_fields: [
+        {
+          key: 'phoneModel',
+          label: { type: 'custom', custom: 'Modelo de Móvil' },
+          type: 'text',
+        }
+      ],
+      metadata: {
+        // Guardamos los datos que no son de envío estándar
+        firstName: shippingDetails.firstName,
+        lastName: shippingDetails.lastName,
+        phone: shippingDetails.phone,
+        phoneModel: shippingDetails.phoneModel
+      },
       success_url: `${appUrl}/?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/?payment_canceled=true`,
     });
 
     if (!session.id) {
-      console.error('StripeActions Error: Stripe session.id no fue devuelto después de la creación.');
-      return { error: 'No se pudo crear la ID de la sesión de Stripe desde la API.' };
+      console.error('StripeActions Error: Stripe session.id no fue devuelto.');
+      return { error: 'No se pudo crear la ID de la sesión de Stripe.' };
     }
 
-    console.log(`StripeActions: Sesión de Stripe Checkout creada exitosamente. Session ID: ${session.id}`);
+    console.log(`StripeActions: Sesión de Stripe para funda creada. Session ID: ${session.id}`);
     return { sessionId: session.id };
 
   } catch (error) {
-    console.error('StripeActions Error: Excepción al crear la sesión de Stripe Checkout:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Error desconocido al interactuar con la API de Stripe.';
+    console.error('StripeActions Error al crear sesión para funda:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido.';
     return { error: `Error del servidor al crear sesión de pago: ${errorMessage}` };
   }
 }
+
+    

@@ -12,17 +12,18 @@ import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { generateAlbumCoverAction } from '@/lib/actions';
-import { Loader2, Sparkles, Download, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, Download, Trash2, CaseSensitive } from 'lucide-react';
 import React from 'react';
 
 interface CoverFormProps {
   onFormChange: (values: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => void;
   initialValues: CoverFormValues & { coverImageUrl?: string | null };
-  onDownload: () => void; 
-  isProcessingPayment: boolean; 
+  onDownloadRequest: () => void;
+  onOrderRequest: () => void;
+  isProcessing: boolean;
 }
 
-export function CoverForm({ onFormChange, initialValues, onDownload, isProcessingPayment }: CoverFormProps) {
+export function CoverForm({ onFormChange, initialValues, onDownloadRequest, onOrderRequest, isProcessing }: CoverFormProps) {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const { toast } = useToast();
 
@@ -135,7 +136,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onDownload)} className="space-y-6 p-4 md:p-6 rounded-lg shadow-lg bg-card w-full max-w-md">
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-6 p-4 md:p-6 rounded-lg shadow-lg bg-card w-full max-w-md">
           <FormField
             control={form.control}
             name="songTitle"
@@ -183,7 +184,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
             variant="outline"
             className="w-full border-primary text-primary hover:bg-primary/10 hover:text-primary"
             onClick={handleGenerateAiCover}
-            disabled={isGeneratingAi || !watch('songTitle') || !watch('artistName') || isProcessingPayment}
+            disabled={isGeneratingAi || !watch('songTitle') || !watch('artistName') || isProcessing}
           >
             {isGeneratingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             Generar Portada con IA
@@ -230,7 +231,7 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
                     onValueChange={(vals) => onSliderChange(vals[0])}
                     max={100}
                     step={1}
-                    themeMode={watch('songTitle') ? 'dark' : 'light'} // Este themeMode podría ser diferente al de la página.
+                    themeMode={watch('songTitle') ? 'dark' : 'light'}
                     className="[&>span:first-child>span]:bg-primary [&>span:nth-child(2)]:bg-spotify-green"
                     aria-label="Porcentaje de progreso de la canción"
                     {...restField}
@@ -241,13 +242,15 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
             )}
           />
 
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
-             <Button type="button" variant="outline" onClick={handleResetForm} className="w-full sm:w-auto" disabled={isProcessingPayment}>
-              <Trash2 className="mr-2 h-4 w-4" /> Reiniciar
+          <div className="flex flex-col gap-4 pt-4">
+            <Button type="button" variant="outline" onClick={onDownloadRequest} disabled={isProcessing}>
+                <Download className="mr-2 h-4 w-4" /> Descargar Imagen (Gratis)
             </Button>
-            <Button type="submit" className="w-full flex-grow bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isProcessingPayment}>
-              {isProcessingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" /> }
-              Descargar Portada
+            <Button type="button" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" onClick={onOrderRequest} disabled={isProcessing}>
+                <CaseSensitive className="mr-2 h-4 w-4" /> Pedir Funda Personalizada (9,99€)
+            </Button>
+            <Button type="button" variant="ghost" onClick={handleResetForm} disabled={isProcessing} className="text-muted-foreground hover:text-foreground">
+              <Trash2 className="mr-2 h-4 w-4" /> Reiniciar
             </Button>
           </div>
         </form>
