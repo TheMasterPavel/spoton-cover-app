@@ -19,6 +19,7 @@ interface CoverPreviewProps {
   themeMode: 'dark' | 'light'; 
 }
 
+// La ref ahora se pasará al CardContent interno
 export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
   (
     {
@@ -47,18 +48,19 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
 
 
     return (
+      // La Card exterior mantiene el color de fondo para la visualización en la web
       <Card
-        ref={ref}
-        id="cover-preview-for-canvas"
         className={cn(
           "w-full max-w-sm shadow-xl border-none rounded-lg overflow-hidden",
+          cardBgColor 
         )}
       >
+        {/* El CardContent interno es el que se capturará y tiene fondo transparente */}
         <CardContent 
+          ref={ref} // La ref se adjunta aquí ahora
           id="card-content-for-canvas"
           className={cn(
-            "p-6 flex flex-col items-center space-y-6",
-            cardBgColor 
+            "p-6 flex flex-col items-center space-y-6 bg-transparent" // ¡CLAVE! Fondo transparente
           )}
         >
           <div 
@@ -73,7 +75,6 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
               backgroundPosition: 'center center',
               backgroundRepeat: 'no-repeat',
             } : {}}
-            // data-ai-hint removed for clarity with html2canvas
           >
             {!imageUrl && (
               <svg 
@@ -86,7 +87,7 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
                 strokeLinecap="round" 
                 strokeLinejoin="round" 
                 className={cn("lucide lucide-music", placeholderSvgColor)}
-                data-ai-hint="abstract music" // data-ai-hint only on placeholder
+                data-ai-hint="abstract music"
               >
                 <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
               </svg>
@@ -148,4 +149,3 @@ export const CoverPreview = React.forwardRef<HTMLDivElement, CoverPreviewProps>(
 );
 
 CoverPreview.displayName = 'CoverPreview';
-

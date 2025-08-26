@@ -54,7 +54,7 @@ function HomePageContent() {
     isPlaying: false,
     themeMode: 'dark' as 'dark' | 'light',
   });
-  const coverPreviewRef = useRef<HTMLDivElement>(null);
+  const coverContentRef = useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
   const router = useRouter();
@@ -67,7 +67,8 @@ function HomePageContent() {
   const [isReadyToDownload, setIsReadyToDownload] = useState(false);
 
   const captureAndDownloadCover = useCallback(async () => {
-    const elementToCapture = coverPreviewRef.current;
+    // Apuntamos al elemento de contenido interno, que tiene el fondo transparente
+    const elementToCapture = coverContentRef.current;
     if (!elementToCapture) {
       toast({
         title: 'Error de Descarga',
@@ -81,7 +82,7 @@ function HomePageContent() {
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null, 
+        backgroundColor: null, // Mantenemos esto para asegurar la transparencia
         scale: 2,
       });
       const imageUrl = canvas.toDataURL('image/png');
@@ -103,7 +104,7 @@ function HomePageContent() {
         variant: 'destructive',
       });
     }
-  }, [coverPreviewRef, toast]);
+  }, [coverContentRef, toast]);
   
   // useEffect para activar la descarga DESPUÉS de que el estado se haya restaurado y renderizado
   useEffect(() => {
@@ -277,12 +278,18 @@ function HomePageContent() {
       setPreviewState(prevState => ({ ...prevState, themeMode: theme }));
   };
 
+  const handleDirectDownload = () => {
+    // Llama directamente a la función de descarga en lugar de abrir el diálogo
+    captureAndDownloadCover();
+  };
+
+
   return (
     <>
       <main className="flex flex-col items-center justify-start py-10 px-4 space-y-8 min-h-screen">
         <div className="w-full max-w-sm">
           <CoverPreview
-            ref={coverPreviewRef}
+            ref={coverContentRef} // Apuntamos a la nueva ref del contenido
             songTitle={previewState.songTitle}
             artistName={previewState.artistName}
             imageUrl={previewState.coverImageUrl}
@@ -315,11 +322,12 @@ function HomePageContent() {
         <CoverForm
           initialValues={previewState}
           onFormChange={handleFormChange}
-          onDownload={captureAndDownloadCover}
+          onDownload={handleDirectDownload} // Cambiado a la descarga directa
           isProcessingPayment={isProcessingPayment}
         />
       </main>
 
+      {/* El diálogo de pago sigue aquí por si quieres reactivarlo, pero no se abrirá con el botón principal */}
       <AlertDialog open={isPaymentDialogOpen} onOpenChange={(open) => {
         if (!isProcessingPayment) {
           setIsPaymentDialogOpen(open);
@@ -354,5 +362,3 @@ export default function HomePage() {
     </Suspense>
   );
 }
-
-    
