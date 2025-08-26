@@ -71,6 +71,16 @@ const getStripe = () => {
   return stripePromise;
 };
 
+async function generateCoverImage(element: HTMLDivElement): Promise<string> {
+    const canvas = await html2canvas(element, {
+      allowTaint: true,
+      useCORS: true,
+      backgroundColor: null,
+      scale: 2,
+    });
+    return canvas.toDataURL('image/png');
+}
+
 // Este es el contenido real de la página que depende de los hooks del lado del cliente.
 function HomePageContent() {
   const [previewState, setPreviewState] = useState({
@@ -90,9 +100,6 @@ function HomePageContent() {
   const [isShippingDialogOpen, setIsShippingDialogOpen] = useState(false);
   const [isUpsellDialogOpen, setIsUpsellDialogOpen] = useState(false);
 
-  // Trigger para la descarga post-pago
-  const [isReadyToDownload, setIsReadyToDownload] = useState(false);
-
   const captureAndDownloadCover = useCallback(async () => {
     const elementToCapture = coverContentRef.current;
     if (!elementToCapture) {
@@ -105,13 +112,7 @@ function HomePageContent() {
     }
 
     try {
-      const canvas = await html2canvas(elementToCapture, {
-        allowTaint: true,
-        useCORS: true,
-        backgroundColor: null, 
-        scale: 2,
-      });
-      const imageUrl = canvas.toDataURL('image/png');
+      const imageUrl = await generateCoverImage(elementToCapture);
       const link = document.createElement('a');
       link.href = imageUrl;
       link.download = 'spoton_cover.png';
@@ -135,70 +136,62 @@ function HomePageContent() {
     }
   }, [coverContentRef, toast]);
   
-  useEffect(() => {
-    if (isReadyToDownload) {
-      const timer = setTimeout(() => {
-        captureAndDownloadCover();
-        setIsReadyToDownload(false);
-      }, 100); 
-
-      return () => clearTimeout(timer);
-    }
-  }, [isReadyToDownload, captureAndDownloadCover]);
-
 
   const handleStripeCheckout = useCallback(async (shippingDetails: ShippingFormValues) => {
     setIsProcessing(true);
+    const elementToCapture = coverContentRef.current;
 
-    try {
-      localStorage.setItem('spotOnCoverPreviewState', JSON.stringify(previewState));
-    } catch (e) {
-      toast({
-        title: "Error de Almacenamiento",
-        description: "No se pudo guardar el estado de tu portada.",
-        variant: "destructive",
-      });
-      setIsProcessing(false);
-      return;
-    }
-
-    const { sessionId, error: sessionError } = await createShippingCheckoutSession(shippingDetails);
-    if (sessionError || !sessionId) {
-      toast({
-        title: 'Error al Iniciar Pago',
-        description: sessionError || 'No se pudo crear la sesión de pago.',
-        variant: 'destructive',
-      });
-      localStorage.removeItem('spotOnCoverPreviewState');
-      setIsProcessing(false);
-      return;
-    }
-
-    const stripe = await getStripe();
-    if (!stripe) {
-      toast({
-        title: 'Error de Configuración',
-        description: 'No se pudo cargar Stripe.',
-        variant: 'destructive',
-      });
-      localStorage.removeItem('spotOnCoverPreviewState');
-      setIsProcessing(false);
-      return;
+    if (!elementToCapture) {
+        toast({
+            title: "Error de Creación",
+            description: "No se pudo encontrar el diseño de la portada.",
+            variant: "destructive",
+        });
+        setIsProcessing(false);
+        return;
     }
 
     try {
+      const coverImageDataUri = await generateCoverImage(elementToCapture);
+
+      const { sessionId, error: sessionError } = await createShippingCheckoutSession({
+          shippingDetails,
+          coverImageDataUri,
+      });
+
+      if (sessionError || !sessionId) {
+        toast({
+          title: 'Error al Iniciar Pago',
+          description: sessionError || 'No se pudo crear la sesión de pago.',
+          variant: 'destructive',
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      const stripe = await getStripe();
+      if (!stripe) {
+        toast({
+          title: 'Error de Configuración',
+          description: 'No se pudo cargar Stripe.',
+          variant: 'destructive',
+        });
+        setIsProcessing(false);
+        return;
+      }
+
       const { error } = await stripe.redirectToCheckout({ sessionId });
       if (error) throw error;
+
     } catch (error: any) {
        toast({
-        title: 'Error de Redirección',
-        description: 'No se pudo redirigir a la página de pago.',
+        title: 'Error en el Proceso de Pago',
+        description: error.message || 'No se pudo redirigir a la página de pago.',
         variant: 'destructive',
       });
-      localStorage.removeItem('spotOnCoverPreviewState');
       setIsProcessing(false);
     }
-  }, [previewState, toast]);
+  }, [toast]);
 
   useEffect(() => {
     const paymentSuccess = searchParams.get('payment_success');
@@ -210,8 +203,6 @@ function HomePageContent() {
         title: '¡Pago Exitoso!',
         description: 'Gracias por tu compra. Tu funda está en camino.',
       });
-      // Clear local storage but don't trigger a download for the case
-      localStorage.removeItem('spotOnCoverPreviewState');
       if (currentPath) router.replace(currentPath, { scroll: false });
     };
 
@@ -221,14 +212,6 @@ function HomePageContent() {
         description: 'Has cancelado el proceso de pago.',
         variant: 'destructive',
       });
-      const savedStateString = localStorage.getItem('spotOnCoverPreviewState');
-      if (savedStateString) {
-        try {
-          const savedState = JSON.parse(savedStateString);
-          setPreviewState(savedState);
-        } catch (e) { /* No hacer nada si falla */ }
-      }
-      localStorage.removeItem('spotOnCoverPreviewState');
       if (currentPath) router.replace(currentPath, { scroll: false });
     };
 
@@ -485,5 +468,3 @@ export default function HomePage() {
     </Suspense>
   );
 }
-
-    

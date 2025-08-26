@@ -35,13 +35,19 @@ async function sendOrderConfirmationEmail(shippingDetails: ShippingFormValues) {
     console.log(`TODO: Enviar email de confirmación de pedido para el modelo ${shippingDetails.phoneModel}`);
 }
 
+interface CreateCheckoutSessionPayload {
+  shippingDetails: ShippingFormValues;
+  coverImageDataUri: string;
+}
+
 
 interface CreateCheckoutSessionResponse {
   sessionId?: string;
   error?: string;
 }
 
-export async function createShippingCheckoutSession(shippingDetails: ShippingFormValues): Promise<CreateCheckoutSessionResponse> {
+export async function createShippingCheckoutSession(payload: CreateCheckoutSessionPayload): Promise<CreateCheckoutSessionResponse> {
+  const { shippingDetails, coverImageDataUri } = payload;
   console.log('StripeActions: Iniciando createShippingCheckoutSession...');
   
   if (stripeError || !stripe) {
@@ -64,7 +70,7 @@ export async function createShippingCheckoutSession(shippingDetails: ShippingFor
             product_data: {
               name: 'Funda de Móvil Personalizada - SpotOn Cover',
               description: `Diseño para el modelo: ${shippingDetails.phoneModel}`,
-              images: [], // Podríamos pasar aquí una URL de la imagen generada si la guardásemos
+              images: [coverImageDataUri], // ¡CLAVE! Guardamos la imagen aquí.
             },
             unit_amount: 999, // 9.99€
           },
@@ -75,13 +81,6 @@ export async function createShippingCheckoutSession(shippingDetails: ShippingFor
       shipping_address_collection: {
         allowed_countries: ['ES', 'US', 'GB', 'DE', 'FR', 'IT', 'PT', 'MX'], // Ejemplo de países
       },
-       custom_fields: [
-        {
-          key: 'phoneModel',
-          label: { type: 'custom', custom: 'Modelo de Móvil' },
-          type: 'text',
-        }
-      ],
       metadata: {
         // Guardamos los datos que no son de envío estándar
         firstName: shippingDetails.firstName,
@@ -107,5 +106,3 @@ export async function createShippingCheckoutSession(shippingDetails: ShippingFor
     return { error: `Error del servidor al crear sesión de pago: ${errorMessage}` };
   }
 }
-
-    
