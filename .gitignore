@@ -4,9 +4,10 @@
 /node_modules
 /.pnp
 .pnp.js
+.yarn/install-state.gz
 
-# Testing
-/coverage
+# Vercel
+.vercel
 
 # Next.js
 /.next/
@@ -15,9 +16,11 @@
 # Production
 /build
 
-# Misc
-.DS_Store
-*.pem
+# Local Environment Variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Logs
 npm-debug.log*
@@ -25,18 +28,11 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Local Env Files
-.env*.local
-.env
+# Test
+/coverage
 
-# IDE
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Genkit
-.genkit/cache
-.genkit/log
+# IDEs and OS files
+.DS_Store
+*.pem
+*.swp
+*~
