@@ -27,6 +27,15 @@ if (!appUrl) {
     stripeError = stripeError ? `${stripeError} ${urlError}` : urlError;
 }
 
+// TODO: Configurar un servicio de envío de correos (Ej: Resend, SendGrid) para la confirmación de pedido.
+async function sendOrderConfirmationEmail(shippingDetails: ShippingFormValues) {
+    // La información del cliente, como el email, no se pasa directamente aquí.
+    // La mejor práctica es obtener el email del cliente desde el objeto de la sesión de Stripe
+    // después de un pago exitoso, usando un webhook de Stripe (payment_intent.succeeded).
+    console.log(`TODO: Enviar email de confirmación de pedido para el modelo ${shippingDetails.phoneModel}`);
+}
+
+
 interface CreateCheckoutSessionResponse {
   sessionId?: string;
   error?: string;
@@ -39,6 +48,11 @@ export async function createShippingCheckoutSession(shippingDetails: ShippingFor
     console.error('StripeActions Error: Stripe no está inicializado.');
     return { error: stripeError || 'Stripe no está inicializado.' };
   }
+
+  // TODO: Una vez que el envío de correos esté configurado, podrías llamar a la función
+  // de confirmación desde un webhook de Stripe para mayor fiabilidad.
+  // Por ahora, lo dejamos como un marcador de posición.
+  // await sendOrderConfirmationEmail(shippingDetails);
 
   try {
     const session = await stripe.checkout.sessions.create({

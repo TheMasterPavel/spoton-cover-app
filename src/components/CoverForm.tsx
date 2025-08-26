@@ -12,7 +12,7 @@ import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { generateAlbumCoverAction } from '@/lib/actions';
-import { Loader2, Sparkles, Download, Trash2, CaseSensitive } from 'lucide-react';
+import { Loader2, Sparkles, Download, Trash2, ShoppingCart } from 'lucide-react';
 import React from 'react';
 
 interface CoverFormProps {
@@ -247,7 +247,7 @@ export function CoverForm({ onFormChange, initialValues, onDownloadRequest, onOr
                 <Download className="mr-2 h-4 w-4" /> Descargar Imagen (Gratis)
             </Button>
             <Button type="button" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" onClick={onOrderRequest} disabled={isProcessing}>
-                <CaseSensitive className="mr-2 h-4 w-4" /> Pedir Funda Personalizada (9,99€)
+                <ShoppingCart className="mr-2 h-4 w-4" /> Pedir Funda Personalizada (9,99€)
             </Button>
             <Button type="button" variant="ghost" onClick={handleResetForm} disabled={isProcessing} className="text-muted-foreground hover:text-foreground">
               <Trash2 className="mr-2 h-4 w-4" /> Reiniciar

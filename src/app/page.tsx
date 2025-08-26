@@ -16,8 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { createCheckoutSession, createShippingCheckoutSession } from '@/lib/stripeActions';
-import { saveEmailAction } from '@/lib/actions';
+import { createShippingCheckoutSession } from '@/lib/stripeActions';
+import { saveEmailAction } from '@/lib/emailActions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,8 +49,8 @@ import { Loader2 } from 'lucide-react';
 
 
 const initialFormValues: CoverFormValues & { coverImageUrl?: string | null } = {
-  songTitle: 'Melodía Increíble',
-  artistName: 'Los Gatos Geniales',
+  songTitle: 'Nombre de la cancion',
+  artistName: 'Artista',
   coverImageFile: undefined,
   coverImageUrl: 'https://placehold.co/600x600.png',
   durationMinutes: 3,
@@ -108,7 +108,7 @@ function HomePageContent() {
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null,
+        backgroundColor: null, 
         scale: 2,
       });
       const imageUrl = canvas.toDataURL('image/png');
