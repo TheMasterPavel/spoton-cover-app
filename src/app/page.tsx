@@ -78,11 +78,10 @@ function HomePageContent() {
     }
 
     try {
-      // Forzar un redespliegue de Vercel
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null,
+        backgroundColor: null, // <-- ESTA ES LA CLAVE PARA LA TRANSPARENCIA
         scale: 2,
       });
       const imageUrl = canvas.toDataURL('image/png');
@@ -121,6 +120,7 @@ function HomePageContent() {
 
 
   const handleStripeCheckout = useCallback(async () => {
+    setIsPaymentDialogOpen(false); // Close dialog immediately
     setIsProcessingPayment(true);
 
     try {
@@ -233,8 +233,6 @@ function HomePageContent() {
   const onDirectDownload = () => {
     // Para modo de prueba, se salta el diálogo de pago y descarga directamente.
     captureAndDownloadCover(); 
-    // Para activar el pago, comenta la línea de arriba y descomenta la de abajo
-    // setIsPaymentDialogOpen(true);
   };
 
 
@@ -323,7 +321,7 @@ function HomePageContent() {
         <CoverForm
           initialValues={previewState}
           onFormChange={handleFormChange}
-          onDownload={onDirectDownload}
+          onDownload={() => setIsPaymentDialogOpen(true)} // This now opens the payment dialog
           isProcessingPayment={isProcessingPayment}
         />
       </main>
@@ -362,5 +360,3 @@ export default function HomePage() {
     </Suspense>
   );
 }
-
-    

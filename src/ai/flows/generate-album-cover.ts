@@ -36,9 +36,11 @@ const generateAlbumCoverPrompt = ai.definePrompt({
   name: 'generateAlbumCoverPrompt',
   input: {schema: GenerateAlbumCoverInputSchema},
   output: {schema: GenerateAlbumCoverOutputSchema},
-  prompt: `Generate a stylized album cover for the song "{{{songTitle}}}" by {{{artistName}}}. The album cover should be visually appealing and reflect the style of the music. Return the image as a data URI.
-
-  Do not include any text in the album cover. Focus on creating an abstract and visually interesting design using colors and shapes related to the song's theme. Make the background transparent.`, // Added transparency instruction.
+  prompt: `Generate a stylized album cover for the song "{{{songTitle}}}" by {{{artistName}}}.
+The final image MUST have a fully transparent background.
+Do not include any text in the album cover.
+Focus on creating an abstract and visually interesting design using colors and shapes related to the song's theme.
+Return the image as a data URI.`,
   config: {
     safetySettings: [
       {
@@ -70,7 +72,7 @@ const generateAlbumCoverFlow = ai.defineFlow(
   async input => {
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-exp',
-      prompt: `Generate an album cover for a song titled "${input.songTitle}" by artist ${input.artistName}. Make the background transparent. Do not include text. Focus on abstract imagery.`, // Included transparency instructions.
+      prompt: `Generate an album cover for a song titled "${input.songTitle}" by artist ${input.artistName}". The image's background MUST be transparent. Do not include any text on the image. Focus on abstract imagery reflecting the song's mood.`,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
       },
