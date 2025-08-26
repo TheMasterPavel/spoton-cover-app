@@ -132,14 +132,10 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
     }
   };
 
-  const onDirectDownload = () => { 
-    onDownload();
-  };
-
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onDirectDownload)} className="space-y-6 p-4 md:p-6 rounded-lg shadow-lg bg-card w-full max-w-md">
+        <form onSubmit={form.handleSubmit(onDownload)} className="space-y-6 p-4 md:p-6 rounded-lg shadow-lg bg-card w-full max-w-md">
           <FormField
             control={form.control}
             name="songTitle"
@@ -259,3 +255,5 @@ export function CoverForm({ onFormChange, initialValues, onDownload, isProcessin
     </>
   );
 }
+
+    

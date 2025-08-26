@@ -81,7 +81,7 @@ function HomePageContent() {
       const canvas = await html2canvas(elementToCapture, {
         allowTaint: true,
         useCORS: true,
-        backgroundColor: null, // <-- ESTA ES LA CLAVE PARA LA TRANSPARENCIA
+        backgroundColor: null, 
         scale: 2,
       });
       const imageUrl = canvas.toDataURL('image/png');
@@ -230,12 +230,6 @@ function HomePageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router, toast]);
 
-  const onDirectDownload = () => {
-    // Para modo de prueba, se salta el diálogo de pago y descarga directamente.
-    captureAndDownloadCover(); 
-  };
-
-
   const handleFormChange = useCallback((newValues: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => {
     setPreviewState(currentPreviewState => {
       const updatedState = { ...currentPreviewState };
@@ -321,7 +315,7 @@ function HomePageContent() {
         <CoverForm
           initialValues={previewState}
           onFormChange={handleFormChange}
-          onDownload={() => setIsPaymentDialogOpen(true)} // This now opens the payment dialog
+          onDownload={captureAndDownloadCover}
           isProcessingPayment={isProcessingPayment}
         />
       </main>
@@ -360,3 +354,5 @@ export default function HomePage() {
     </Suspense>
   );
 }
+
+    
