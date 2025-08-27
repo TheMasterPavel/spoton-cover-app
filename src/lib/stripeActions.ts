@@ -24,6 +24,7 @@ if (!stripeSecretKey) {
 if (!appUrl) {
     const urlError = 'Error de configuración del servidor: La variable de entorno NEXT_PUBLIC_APP_URL no está definida. Por favor, configúrala en Vercel.';
     console.error(urlError);
+    // Añade el nuevo error al error existente si lo hay.
     stripeError = stripeError ? `${stripeError} ${urlError}` : urlError;
 }
 
@@ -51,7 +52,7 @@ export async function createShippingCheckoutSession(payload: CreateCheckoutSessi
   console.log('StripeActions: Iniciando createShippingCheckoutSession...');
   
   if (stripeError || !stripe) {
-    console.error('StripeActions Error: Stripe no está inicializado.');
+    console.error('StripeActions Error: Stripe no está inicializado o faltan variables de entorno.');
     return { error: stripeError || 'Stripe no está inicializado.' };
   }
 
