@@ -38,7 +38,8 @@ async function sendOrderConfirmationEmail(shippingDetails: ShippingFormValues) {
 
 interface CreateCheckoutSessionPayload {
   shippingDetails: ShippingFormValues;
-  coverImageDataUri: string;
+  // La imagen ya no se pasa aquí para evitar errores de longitud de URL.
+  // coverImageDataUri: string;
 }
 
 
@@ -48,7 +49,7 @@ interface CreateCheckoutSessionResponse {
 }
 
 export async function createShippingCheckoutSession(payload: CreateCheckoutSessionPayload): Promise<CreateCheckoutSessionResponse> {
-  const { shippingDetails, coverImageDataUri } = payload;
+  const { shippingDetails } = payload;
   console.log('StripeActions: Iniciando createShippingCheckoutSession...');
   
   if (stripeError || !stripe) {
@@ -71,7 +72,8 @@ export async function createShippingCheckoutSession(payload: CreateCheckoutSessi
             product_data: {
               name: 'Funda de Móvil Personalizada - SpotOn Cover',
               description: `Diseño para el modelo: ${shippingDetails.phoneModel}`,
-              images: [coverImageDataUri], // ¡CLAVE! Guardamos la imagen aquí.
+              // ¡CLAVE! Se elimina la imagen de los datos del producto.
+              // images: [coverImageDataUri], 
             },
             unit_amount: 999, // 9.99€
           },

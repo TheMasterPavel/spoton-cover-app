@@ -139,24 +139,13 @@ function HomePageContent() {
 
   const handleStripeCheckout = useCallback(async (shippingDetails: ShippingFormValues) => {
     setIsProcessing(true);
-    const elementToCapture = coverContentRef.current;
-
-    if (!elementToCapture) {
-        toast({
-            title: "Error de Creación",
-            description: "No se pudo encontrar el diseño de la portada.",
-            variant: "destructive",
-        });
-        setIsProcessing(false);
-        return;
-    }
+    
+    // Ya no es necesario generar la imagen aquí ya que no se envía a Stripe.
+    // El cliente la descarga por su cuenta.
 
     try {
-      const coverImageDataUri = await generateCoverImage(elementToCapture);
-
       const { sessionId, error: sessionError } = await createShippingCheckoutSession({
           shippingDetails,
-          coverImageDataUri,
       });
 
       if (sessionError || !sessionId) {
