@@ -38,8 +38,7 @@ async function sendOrderConfirmationEmail(shippingDetails: ShippingFormValues) {
 
 interface CreateCheckoutSessionPayload {
   shippingDetails: ShippingFormValues;
-  // La imagen ya no se pasa aquí para evitar errores de longitud de URL.
-  // coverImageDataUri: string;
+  coverImageUrl: string;
 }
 
 
@@ -49,18 +48,13 @@ interface CreateCheckoutSessionResponse {
 }
 
 export async function createShippingCheckoutSession(payload: CreateCheckoutSessionPayload): Promise<CreateCheckoutSessionResponse> {
-  const { shippingDetails } = payload;
+  const { shippingDetails, coverImageUrl } = payload;
   console.log('StripeActions: Iniciando createShippingCheckoutSession...');
   
   if (stripeError || !stripe) {
     console.error('StripeActions Error: Stripe no está inicializado o faltan variables de entorno.');
     return { error: stripeError || 'Stripe no está inicializado.' };
   }
-
-  // TODO: Una vez que el envío de correos esté configurado, podrías llamar a la función
-  // de confirmación desde un webhook de Stripe para mayor fiabilidad.
-  // Por ahora, lo dejamos como un marcador de posición.
-  // await sendOrderConfirmationEmail(shippingDetails);
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -72,8 +66,7 @@ export async function createShippingCheckoutSession(payload: CreateCheckoutSessi
             product_data: {
               name: 'Funda de Móvil Personalizada - SpotOn Cover',
               description: `Diseño para el modelo: ${shippingDetails.phoneModel}`,
-              // ¡CLAVE! Se elimina la imagen de los datos del producto.
-              // images: [coverImageDataUri], 
+              images: [coverImageUrl], 
             },
             unit_amount: 999, // 9.99€
           },
@@ -89,7 +82,8 @@ export async function createShippingCheckoutSession(payload: CreateCheckoutSessi
         firstName: shippingDetails.firstName,
         lastName: shippingDetails.lastName,
         phone: shippingDetails.phone,
-        phoneModel: shippingDetails.phoneModel
+        phoneModel: shippingDetails.phoneModel,
+        coverImageUrl: coverImageUrl, // ¡CLAVE! Guardamos la URL de Firebase Storage
       },
       success_url: `${appUrl}/?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/?payment_canceled=true`,

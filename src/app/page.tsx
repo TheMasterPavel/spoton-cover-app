@@ -18,6 +18,8 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { createShippingCheckoutSession } from '@/lib/stripeActions';
 import { saveEmailAction } from '@/lib/emailActions';
+import { uploadCoverImageAction } from '@/lib/actions';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -139,46 +141,51 @@ function HomePageContent() {
 
   const handleStripeCheckout = useCallback(async (shippingDetails: ShippingFormValues) => {
     setIsProcessing(true);
-    
-    // Ya no es necesario generar la imagen aquí ya que no se envía a Stripe.
-    // El cliente la descarga por su cuenta.
+    const elementToCapture = coverContentRef.current;
+
+    if (!elementToCapture) {
+        toast({ title: 'Error', description: 'No se encontró el elemento de la portada.', variant: 'destructive' });
+        setIsProcessing(false);
+        return;
+    }
 
     try {
-      const { sessionId, error: sessionError } = await createShippingCheckoutSession({
-          shippingDetails,
-      });
+        // Paso 1: Generar la imagen desde el canvas
+        const imageDataUri = await generateCoverImage(elementToCapture);
+        
+        // Paso 2: Subir la imagen a Firebase Storage a través de la Server Action
+        const uploadResponse = await uploadCoverImageAction({ imageDataUri });
 
-      if (sessionError || !sessionId) {
-        toast({
-          title: 'Error al Iniciar Pago',
-          description: sessionError || 'No se pudo crear la sesión de pago.',
-          variant: 'destructive',
+        if (uploadResponse.error || !uploadResponse.downloadUrl) {
+            throw new Error(uploadResponse.error || 'No se pudo obtener la URL de la imagen subida.');
+        }
+        
+        // Paso 3: Crear la sesión de Stripe con la URL de la imagen de Firebase
+        const { sessionId, error: sessionError } = await createShippingCheckoutSession({
+            shippingDetails,
+            coverImageUrl: uploadResponse.downloadUrl,
         });
-        setIsProcessing(false);
-        return;
-      }
 
-      const stripe = await getStripe();
-      if (!stripe) {
-        toast({
-          title: 'Error de Configuración',
-          description: 'No se pudo cargar Stripe.',
-          variant: 'destructive',
-        });
-        setIsProcessing(false);
-        return;
-      }
+        if (sessionError || !sessionId) {
+            throw new Error(sessionError || 'No se pudo crear la sesión de pago.');
+        }
 
-      const { error } = await stripe.redirectToCheckout({ sessionId });
-      if (error) throw error;
+        const stripe = await getStripe();
+        if (!stripe) {
+            throw new Error('No se pudo cargar Stripe.');
+        }
+
+        const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
+        if (stripeError) throw stripeError;
 
     } catch (error: any) {
        toast({
-        title: 'Error en el Proceso de Pago',
-        description: error.message || 'No se pudo redirigir a la página de pago.',
+        title: 'Error en el Proceso de Pedido',
+        description: error.message || 'Ocurrió un error inesperado.',
         variant: 'destructive',
       });
-      setIsProcessing(false);
+    } finally {
+        setIsProcessing(false);
     }
   }, [toast]);
 
