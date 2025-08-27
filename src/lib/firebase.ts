@@ -1,3 +1,4 @@
+
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getStorage } from "firebase/storage";
@@ -5,14 +6,15 @@ import { getStorage } from "firebase/storage";
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
-// IMPORTANT: Replace this with your actual Firebase config object
+// IMPORTANT: This is your actual Firebase config object.
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  "projectId": "spoton-cover",
+  "appId": "1:727089932575:web:b17a0d5bbbae9e8aa8282a",
+  "storageBucket": "spoton-cover.firebasestorage.app",
+  "apiKey": "AIzaSyDdhsVivN6SkzsHAba2RqTKC4eER_QdRpU",
+  "authDomain": "spoton-cover.firebaseapp.com",
+  "measurementId": "",
+  "messagingSenderId": "727089932575"
 };
 
 // Initialize Firebase
