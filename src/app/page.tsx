@@ -10,12 +10,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 import { CoverForm } from '@/components/CoverForm';
 import { CoverPreview } from '@/components/CoverPreview';
-import type { CoverFormValues } from '@/lib/schema';
-import { CoverFormSchema } from '@/lib/schema';
+import type { CoverFormValues, EmailFormValues } from '@/lib/schema';
+import { CoverFormSchema, EmailFormSchema } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { createCheckoutSession } from '@/lib/stripeActions';
+import { saveEmailAction } from '@/lib/emailActions';
 
 import {
   AlertDialog,
@@ -27,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 
 
@@ -81,6 +83,10 @@ function HomePageContent() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaymentAlertOpen, setIsPaymentAlertOpen] = useState(false);
+  const [isEmailAlertOpen, setIsEmailAlertOpen] = useState(false);
+  const [emailForFreeDownload, setEmailForFreeDownload] = useState('');
+  const [emailError, setEmailError] = useState('');
+
 
   const captureAndDownloadCover = useCallback(async () => {
     setIsProcessing(true);
@@ -160,6 +166,48 @@ function HomePageContent() {
        setIsProcessing(false);
     }
   }, [previewState, toast]);
+
+  const handleFreeDownload = useCallback(async () => {
+    // 1. Validate email
+    const validationResult = EmailFormSchema.safeParse({ email: emailForFreeDownload });
+    if (!validationResult.success) {
+      setEmailError(validationResult.error.errors[0].message);
+      return;
+    }
+    
+    setIsProcessing(true);
+    setEmailError('');
+
+    try {
+      // 2. Call server action to save email
+      const result = await saveEmailAction({ email: emailForFreeDownload });
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      
+      // 3. Close dialog and show success toast
+      setIsEmailAlertOpen(false);
+      toast({
+        title: '¡Gracias!',
+        description: 'Tu descarga gratuita comenzará en breve.',
+      });
+      
+      // 4. Trigger download
+      await captureAndDownloadCover();
+      
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo procesar tu solicitud.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessing(false);
+      setEmailForFreeDownload(''); // Reset email field
+    }
+  }, [emailForFreeDownload, toast, captureAndDownloadCover]);
+
 
   useEffect(() => {
     const paymentSuccess = searchParams.get('payment_success');
@@ -284,6 +332,7 @@ function HomePageContent() {
           initialValues={previewState}
           onFormChange={handleFormChange}
           onCheckoutRequest={() => setIsPaymentAlertOpen(true)}
+          onFreeDownloadRequest={() => setIsEmailAlertOpen(true)}
           isProcessing={isProcessing}
         />
       </main>
@@ -306,6 +355,37 @@ function HomePageContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Email for Free Download Dialog */}
+      <AlertDialog open={isEmailAlertOpen} onOpenChange={setIsEmailAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Descarga Gratuita</AlertDialogTitle>
+            <AlertDialogDescription>
+              Introduce tu email para recibir tu descarga gratuita. No te enviaremos spam.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Input
+              id="email"
+              type="email"
+              placeholder="tu@email.com"
+              value={emailForFreeDownload}
+              onChange={(e) => setEmailForFreeDownload(e.target.value)}
+              disabled={isProcessing}
+              className={emailError ? 'border-destructive' : ''}
+            />
+            {emailError && <p className="text-sm text-destructive mt-2">{emailError}</p>}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessing} onClick={() => setEmailError('')}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleFreeDownload} disabled={isProcessing || !emailForFreeDownload}>
+               {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Descargar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
@@ -318,5 +398,3 @@ export default function HomePage() {
     </Suspense>
   );
 }
-
-    

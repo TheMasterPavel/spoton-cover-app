@@ -12,17 +12,18 @@ import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { generateAlbumCoverAction } from '@/lib/actions';
-import { Loader2, Sparkles, Download, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, Download, Mail, Trash2 } from 'lucide-react';
 import React from 'react';
 
 interface CoverFormProps {
   onFormChange: (values: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => void;
   initialValues: CoverFormValues & { coverImageUrl?: string | null };
   onCheckoutRequest: () => void;
+  onFreeDownloadRequest: () => void;
   isProcessing: boolean;
 }
 
-export function CoverForm({ onFormChange, initialValues, onCheckoutRequest, isProcessing }: CoverFormProps) {
+export function CoverForm({ onFormChange, initialValues, onCheckoutRequest, onFreeDownloadRequest, isProcessing }: CoverFormProps) {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const { toast } = useToast();
 
@@ -254,6 +255,16 @@ export function CoverForm({ onFormChange, initialValues, onCheckoutRequest, isPr
             >
                 <Download className="mr-2 h-4 w-4" /> Pagar 0,99€ y Descargar
             </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onFreeDownloadRequest}
+              disabled={isProcessing || isGeneratingAi}
+              className="w-full"
+            >
+              <Mail className="mr-2 h-4 w-4" />
+              Descargar Gratis (con Email)
+            </Button>
             <Button type="button" variant="ghost" onClick={handleResetForm} disabled={isProcessing || isGeneratingAi} className="text-muted-foreground hover:text-foreground">
               <Trash2 className="mr-2 h-4 w-4" /> Reiniciar
             </Button>
@@ -263,5 +274,3 @@ export function CoverForm({ onFormChange, initialValues, onCheckoutRequest, isPr
     </>
   );
 }
-
-    

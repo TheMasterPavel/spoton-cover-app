@@ -40,5 +40,3 @@ export const ShippingFormSchema = z.object({
 });
 
 export type ShippingFormValues = z.infer<typeof ShippingFormSchema>;
-
-    
