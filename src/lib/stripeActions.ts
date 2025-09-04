@@ -2,7 +2,6 @@
 'use server';
 
 import Stripe from 'stripe';
-import type { ShippingFormValues } from '@/lib/schema';
 
 // Lee las variables de entorno una sola vez.
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -28,33 +27,21 @@ if (!appUrl) {
     stripeError = stripeError ? `${stripeError} ${urlError}` : urlError;
 }
 
-// TODO: Configurar un servicio de envío de correos (Ej: Resend, SendGrid) para la confirmación de pedido.
-async function sendOrderConfirmationEmail(shippingDetails: ShippingFormValues) {
-    // La información del cliente, como el email, no se pasa directamente aquí.
-    // La mejor práctica es obtener el email del cliente desde el objeto de la sesión de Stripe
-    // después de un pago exitoso, usando un webhook de Stripe (payment_intent.succeeded).
-    console.log(`TODO: Enviar email de confirmación de pedido para el modelo ${shippingDetails.phoneModel}`);
-}
-
-interface CreateCheckoutSessionPayload {
-  shippingDetails: ShippingFormValues;
-  coverImageUrl: string;
-}
-
-
 interface CreateCheckoutSessionResponse {
   sessionId?: string;
   error?: string;
 }
 
-export async function createShippingCheckoutSession(payload: CreateCheckoutSessionPayload): Promise<CreateCheckoutSessionResponse> {
-  const { shippingDetails, coverImageUrl } = payload;
-  console.log('StripeActions: Iniciando createShippingCheckoutSession...');
+export async function createCheckoutSession(): Promise<CreateCheckoutSessionResponse> {
+  console.log('StripeActions: Iniciando createCheckoutSession para descarga digital...');
   
   if (stripeError || !stripe) {
     console.error('StripeActions Error: Stripe no está inicializado o faltan variables de entorno.');
     return { error: stripeError || 'Stripe no está inicializado.' };
   }
+
+  const successUrl = `${appUrl}/?payment_success=true&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = `${appUrl}/?payment_canceled=true`;
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -64,29 +51,19 @@ export async function createShippingCheckoutSession(payload: CreateCheckoutSessi
           price_data: {
             currency: 'eur',
             product_data: {
-              name: 'Funda de Móvil Personalizada - SpotOn Cover',
-              description: `Diseño para el modelo: ${shippingDetails.phoneModel}`,
-              images: [coverImageUrl], 
+              name: 'Portada Personalizada de SpotOn Cover',
+              description: 'Descarga digital de la imagen de portada generada.',
+              // Puedes añadir una imagen genérica si quieres
+              // images: ['URL_DE_IMAGEN_GENERICA_SI_LA_TIENES'], 
             },
-            unit_amount: 999, // 9.99€
+            unit_amount: 99, // 0.99€
           },
           quantity: 1,
         },
       ],
       mode: 'payment',
-      shipping_address_collection: {
-        allowed_countries: ['ES', 'US', 'GB', 'DE', 'FR', 'IT', 'PT', 'MX'], // Ejemplo de países
-      },
-      metadata: {
-        // Guardamos los datos que no son de envío estándar
-        firstName: shippingDetails.firstName,
-        lastName: shippingDetails.lastName,
-        phone: shippingDetails.phone,
-        phoneModel: shippingDetails.phoneModel,
-        coverImageUrl: coverImageUrl, // ¡CLAVE! Guardamos la URL de Firebase Storage
-      },
-      success_url: `${appUrl}/?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/?payment_canceled=true`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
     });
 
     if (!session.id) {
@@ -94,12 +71,14 @@ export async function createShippingCheckoutSession(payload: CreateCheckoutSessi
       return { error: 'No se pudo crear la ID de la sesión de Stripe.' };
     }
 
-    console.log(`StripeActions: Sesión de Stripe para funda creada. Session ID: ${session.id}`);
+    console.log(`StripeActions: Sesión de Stripe para descarga creada. Session ID: ${session.id}`);
     return { sessionId: session.id };
 
   } catch (error) {
-    console.error('StripeActions Error al crear sesión para funda:', error);
+    console.error('StripeActions Error al crear sesión de descarga:', error);
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido.';
     return { error: `Error del servidor al crear sesión de pago: ${errorMessage}` };
   }
 }
+
+    

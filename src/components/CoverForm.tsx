@@ -12,18 +12,17 @@ import { Slider } from '@/components/ui/slider';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { generateAlbumCoverAction } from '@/lib/actions';
-import { Loader2, Sparkles, Download, Trash2, ShoppingCart } from 'lucide-react';
+import { Loader2, Sparkles, Download, Trash2 } from 'lucide-react';
 import React from 'react';
 
 interface CoverFormProps {
   onFormChange: (values: Partial<CoverFormValues & { coverImageUrl?: string | null; coverImageFile?: FileList | undefined }>) => void;
   initialValues: CoverFormValues & { coverImageUrl?: string | null };
-  onDownloadRequest: () => void;
-  onOrderRequest: () => void;
+  onCheckoutRequest: () => void;
   isProcessing: boolean;
 }
 
-export function CoverForm({ onFormChange, initialValues, onDownloadRequest, onOrderRequest, isProcessing }: CoverFormProps) {
+export function CoverForm({ onFormChange, initialValues, onCheckoutRequest, isProcessing }: CoverFormProps) {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const { toast } = useToast();
 
@@ -115,17 +114,21 @@ export function CoverForm({ onFormChange, initialValues, onDownloadRequest, onOr
 
   const handleResetForm = () => {
     reset({
-      songTitle: initialValues.songTitle,
-      artistName: initialValues.artistName,
-      coverImageFile: undefined, // Siempre resetear el input de archivo visualmente
-      durationMinutes: initialValues.durationMinutes,
-      durationSeconds: initialValues.durationSeconds,
-      progressPercentage: initialValues.progressPercentage,
+      songTitle: 'Nombre de la cancion',
+      artistName: 'Artista',
+      coverImageFile: undefined,
+      durationMinutes: 3,
+      durationSeconds: 30,
+      progressPercentage: 40,
     });
     onFormChange({ 
-      ...initialValues, 
-      coverImageUrl: initialValues.coverImageUrl, 
-      coverImageFile: undefined 
+      songTitle: 'Nombre de la cancion',
+      artistName: 'Artista',
+      coverImageUrl: 'https://placehold.co/600x600.png',
+      coverImageFile: undefined,
+      durationMinutes: 3,
+      durationSeconds: 30,
+      progressPercentage: 40,
     });
     const fileInput = document.getElementById('coverImageFile-input') as HTMLInputElement;
     if (fileInput) {
@@ -243,13 +246,15 @@ export function CoverForm({ onFormChange, initialValues, onDownloadRequest, onOr
           />
 
           <div className="flex flex-col gap-4 pt-4">
-            <Button type="button" variant="outline" onClick={onDownloadRequest} disabled={isProcessing}>
-                <Download className="mr-2 h-4 w-4" /> Descargar Imagen (Gratis)
+            <Button 
+                type="button" 
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" 
+                onClick={onCheckoutRequest} 
+                disabled={isProcessing || isGeneratingAi}
+            >
+                <Download className="mr-2 h-4 w-4" /> Pagar 0,99€ y Descargar
             </Button>
-            <Button type="button" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" onClick={onOrderRequest} disabled={isProcessing}>
-                <ShoppingCart className="mr-2 h-4 w-4" /> Pedir Funda Personalizada (9,99€)
-            </Button>
-            <Button type="button" variant="ghost" onClick={handleResetForm} disabled={isProcessing} className="text-muted-foreground hover:text-foreground">
+            <Button type="button" variant="ghost" onClick={handleResetForm} disabled={isProcessing || isGeneratingAi} className="text-muted-foreground hover:text-foreground">
               <Trash2 className="mr-2 h-4 w-4" /> Reiniciar
             </Button>
           </div>

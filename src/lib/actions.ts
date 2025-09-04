@@ -2,10 +2,6 @@
 'use server';
 
 import { generateAlbumCover, type GenerateAlbumCoverInput, type GenerateAlbumCoverOutput } from '@/ai/flows/generate-album-cover';
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { app } from '@/lib/firebase'; // Asegúrate de que este archivo esté configurado
-import { v4 as uuidv4 } from 'uuid'; // Necesitarás instalar uuid: npm install uuid && npm install @types/uuid
-
 
 // Verificar la clave de API al inicio.
 if (!process.env.GEMINI_API_KEY) {
@@ -35,40 +31,4 @@ export async function generateAlbumCoverAction(
   }
 }
 
-interface UploadCoverImagePayload {
-    imageDataUri: string;
-}
-
-interface UploadCoverImageResponse {
-    downloadUrl?: string;
-    error?: string;
-}
-
-export async function uploadCoverImageAction(payload: UploadCoverImagePayload): Promise<UploadCoverImageResponse> {
-    const { imageDataUri } = payload;
-    
-    if (!imageDataUri) {
-        return { error: 'No se proporcionó la imagen.' };
-    }
-
-    try {
-        const storage = getStorage(app);
-        const imageId = uuidv4();
-        const storageRef = ref(storage, `covers/${imageId}.png`);
-
-        // Sube la imagen desde el Data URI (formato base64)
-        const uploadResult = await uploadString(storageRef, imageDataUri, 'data_url');
-        
-        // Obtiene la URL de descarga pública
-        const downloadUrl = await getDownloadURL(uploadResult.ref);
-
-        console.log('Imagen subida a Firebase Storage. URL:', downloadUrl);
-        return { downloadUrl };
-
-    } catch (error) {
-        console.error("Error al subir la imagen a Firebase Storage:", error);
-        const errorMessage = error instanceof Error ? error.message : "Error desconocido.";
-        return { error: `No se pudo subir la imagen: ${errorMessage}` };
-    }
-}
     
